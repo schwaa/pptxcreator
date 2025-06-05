@@ -1,0 +1,46 @@
+{
+    "sections": [
+        {
+            "layout_name": "Title Slide",
+            "title": "Quarterly Business Review",
+            "subtitle": "Performance & Outlook Q2 2025"
+        },
+        {
+            "layout_name": "Title and Content",
+            "title": "Executive Summary",
+            "bullets": [
+                "Strong revenue growth across all segments.",
+                "New product launch exceeded expectations.",
+                "Market share increased in key regions."
+            ]
+        },
+        {
+            "layout_name": "Image Left, Text Right",
+            "title": "Marketing Campaign Impact",
+            "image_path": "images/marketing_chart.png",
+            "text_content": "Our targeted digital marketing campaigns resulted in a 35% increase in lead generation and significantly improved brand recall in our target demographics."
+        },
+        {
+            "layout_name": "Text Left, Image Right",
+            "title": "Operational Efficiency Gains",
+            "text_content": "Streamlined supply chain processes led to a 10% reduction in production costs and improved delivery times. Employee satisfaction also saw a notable rise.",
+            "image_path": "images/efficiency_graph.png"
+        },
+        {
+            "layout_name": "Full Width Image with Caption",
+            "title": "New Product Launch: Alpha Series",
+            "image_path": "images/alpha_product.png",
+            "caption": "The 'Alpha Series' has been a game-changer, capturing significant market interest."
+        },
+        {
+            "layout_name": "Blank",
+            "title": "Sales by Region (Q2 2025)",
+            "chart_data": {
+                "categories": ["North America", "Europe", "Asia", "South America"],
+                "series": [
+                    {"name": "Revenue ($M)", "values": [150, 110, 90, 40]}
+                ]
+            }
+        }
+    ]
+}

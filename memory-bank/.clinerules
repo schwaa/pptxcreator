@@ -1,0 +1,27 @@
+# Project Rules and Conventions
+
+## Code Structure and Organization
+- Adhere strictly to the project structure defined in the instructions
+- Prioritize modularity: Separate core logic (generator.py) from utilities (utils.py) and the CLI (main.py)
+- When creating new files, ensure correct directory placement
+
+## Coding Standards
+- Implement robust error handling for file operations (reading data, loading templates, saving output)
+- Provide clear, actionable error messages
+- Ensure all Python code follows PEP 8 style guidelines
+- Use f-strings for clear and efficient string formatting
+- Provide informative print statements to indicate progress and warnings during execution
+
+## File and Path Handling
+- Always use absolute or relative paths carefully to ensure files are found regardless of execution context
+- For placeholder identification, prioritize finding by 'name' (if named in template) over 'index' for greater robustness
+
+## Dependencies and Environment
+- When adding dependencies, specify them clearly in `requirements.txt`
+- For dummy image generation, ensure the `Pillow` library is used and handle its potential absence gracefully
+- Ensure the virtual environment is created and activated before installing dependencies or running the project
+- Explicitly use `python3.13` (or the confirmed installed version) for virtual environment creation
+
+## Documentation and Version Control
+- Maintain a consistent and helpful tone in all user-facing output and documentation
+- For Git commits, use conventional commits (e.g., 'feat:', 'fix:', 'docs:') for clarity
