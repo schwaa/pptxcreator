@@ -3,55 +3,85 @@
 ## Architecture Overview
 ```mermaid
 flowchart TD
-    CLI[CLI Interface] --> Generator[Generator Core]
-    Generator --> TemplateHandler[Template Handler]
-    Generator --> DataHandler[Data Handler]
-    Generator --> ChartBuilder[Chart Builder]
+    subgraph Analysis["Template Analysis (One-time)"]
+        Analyzer[Template Analyzer] --> TempMap[Template Map JSON]
+    end
     
-    TemplateHandler --> FileOps[File Operations]
-    DataHandler --> FileOps
-    ChartBuilder --> FileOps
-    
-    FileOps --> Output[Generated PPTX]
+    subgraph Generation["Presentation Generation (Runtime)"]
+        CLI[CLI Interface] --> Generator[Generator Core]
+        Generator --> TemplateHandler[Template Handler]
+        Generator --> DataHandler[Data Handler]
+        Generator --> ChartBuilder[Chart Builder]
+        
+        TempMap -.-> Generator
+        TemplateHandler --> FileOps[File Operations]
+        DataHandler --> FileOps
+        ChartBuilder --> FileOps
+        
+        FileOps --> Output[Generated PPTX]
+    end
 ```
 
 ## Component Relationships
 
-### 1. CLI Interface (main.py)
+### 1. Template Analyzer (template_analyzer.py)
+- Analyzes PowerPoint template structure
+- Identifies layouts and their semantic types
+- Maps placeholders and their properties
+- Generates template_map.json configuration
+
+### 2. CLI Interface (main.py)
+- Provides analyze and generate subcommands
 - Handles command-line arguments and user interaction
-- Validates input parameters
-- Orchestrates the generation process
+- Validates input parameters and paths
+- Orchestrates analysis and generation processes
 - Provides progress feedback and error messages
 
-### 2. Generator Core (generator.py)
+### 3. Generator Core (generator.py)
+- Uses template_map.json for layout decisions
 - Coordinates between components
 - Manages the presentation generation workflow
-- Handles template and content synchronization
+- Maps semantic content types to layouts
 - Validates data against template structure
 
-### 3. Template Handler
+### 4. Template Handler
 - Loads and parses PowerPoint templates
 - Identifies placeholder locations and types
 - Manages slide layouts and master slides
 - Ensures template integrity
 
-### 4. Data Handler
+### 5. Data Handler
 - Parses JSON input data
 - Validates data structure
 - Maps data to template placeholders
 - Handles data type conversions
 
-### 5. Chart Builder
+### 6. Chart Builder
 - Creates charts from structured data
 - Handles different chart types
 - Manages chart styling and formatting
 - Integrates charts into slides
 
-### 6. File Operations
+### 7. File Operations
 - Manages file I/O operations
 - Handles path resolution
 - Implements error handling for file operations
 - Manages temporary files and cleanup
+
+## Key Data Artifacts
+
+1. **Template Map (template_map.json)**
+   - Structured mapping of template layouts
+   - Semantic type classifications
+   - Placeholder details and properties
+   - Created by template_analyzer.py
+   - Used by generator.py at runtime
+
+2. **Data Input (example_report_data.json)**
+   - Structured content definitions
+   - Semantic content type specifications
+   - Text, images, and chart data
+   - Maps to template layouts via semantic types
 
 ## Design Patterns
 

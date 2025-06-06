@@ -1,85 +1,94 @@
 # Active Context
 
 ## Current Work Focus
-Core functionality, CLI interface, and packaging setup are complete. Next focus is on example templates and documentation. Current project structure:
+Implementing template analysis system and revising core architecture for more robust presentation generation. Project structure now includes template analysis phase:
 
 ```
 pptx-generator/
-├── setup.py        # ✅ Completed
+├── setup.py            # ✅ Completed
+├── template_map.json   # 🔄 To be generated
 ├── pptx_generator/
 │   ├── __init__.py
-│   ├── utils.py         # ✅ Completed
-│   ├── generator.py     # ✅ Completed
-│   ├── main.py         # ✅ Completed
+│   ├── utils.py           # ✅ Completed
+│   ├── generator.py       # 🔄 Revising
+│   ├── template_analyzer.py # ⏳ Pending
+│   ├── main.py           # 🔄 Revising
 │   ├── data/
-│   │   └── example_report_data.json  # ✅ Created
+│   │   └── example_report_data.json  # 🔄 Updating
 │   ├── images/         # For dummy images
 │   ├── output/         # For generated files
-│   └── templates/      # Needs example template
-└── README.md
+│   └── templates/      # Has example template
 ```
 
 ## Recent Changes
-- Added setup.py for PyPI packaging and distribution
-- Set up console script entry point 'pptx-gen'
-- Configured package dependencies and metadata
-- Created example data with business report scenario
-- Prepared project resources:
-  - Package structure finalized
-  - Example JSON data defined
-  - Image placeholders identified (marketing_chart.png, efficiency_graph.png, alpha_product.png)
+- Architected new template analysis system
+- Added template_analyzer.py design
+- Enhanced CLI design with analyze/generate commands
+- Introduced semantic typing for layouts
+- Refined project architecture:
+  - Separation of analysis and generation phases
+  - Template map as intermediate artifact
+  - Semantic content type mapping
 
 ## Active Decisions
-1. **Project Structure**
-   - Following standard Python package layout
-   - Separate directories for data, templates, and output
-   - Clear separation of concerns in module structure
+1. **Architecture Enhancement**
+   - Split process into analysis and generation phases
+   - Use template map as persistent configuration
+   - Implement semantic type detection
+   - Support manual map refinement
 
 2. **Documentation**
-   - Comprehensive memory bank established
-   - Project requirements and constraints documented
-   - System architecture defined
+   - Memory bank updated for new architecture
+   - Template map schema defined
+   - Semantic type specifications documented
+   - Process workflow documented
 
-3. **Development Environment**
-   - Python 3.13+ selected as base requirement
-   - Virtual environment approach established
-   - Key dependencies identified
+3. **Development Approach**
+   - Incremental implementation of analyzer
+   - Phased refactoring of generator
+   - Template-driven development
+   - Strong error handling
 
 ## Current Considerations
 1. **Implementation Priority**
-   - Core generator module (generator.py) is next priority
-   - Need to leverage utils.py placeholder functions
-   - Design data structure for template mapping
+   - Template analyzer development first
+   - Generator refactoring second
+   - CLI interface update third
+   - Example data revision last
 
 2. **Technical Challenges**
-   - Ensuring robust template processing
-   - Handling various placeholder types
-   - Managing chart generation
-   - Error handling strategy
+   - Layout semantic type detection
+   - Placeholder identification and mapping
+   - Template map schema design
+   - Backwards compatibility
 
 3. **Next Phase Requirements**
-   - Test suite setup
-   - Sample templates creation
-   - Documentation expansion
+   - Template analysis workflow
+   - Map validation system
+   - Documentation updates
+   - Testing strategy
 
 ## Immediate Next Steps
-1. Create example PowerPoint template
-   - Include all supported layouts
-   - Add named placeholders for content
-   - Test with example data
+1. Implement template_analyzer.py
+   - Layout analysis functionality
+   - Semantic type detection
+   - Map generation
+   - Validation checks
 
-2. Project packaging
-   - Update package metadata with actual values
-   - Write detailed installation instructions
-   - Create MANIFEST.in for data files
+2. Update generator.py
+   - Template map integration
+   - Semantic type mapping
+   - Content type handling
+   - Error handling enhancements
 
-3. Testing and documentation
-   - Write unit tests for core modules
-   - Add integration tests
-   - Complete API documentation
+3. Revise main.py
+   - Add analyze command
+   - Update generate command
+   - Improve error messages
+   - Add progress feedback
 
 ## Open Questions
-- Chart generation implementation details
-- Template validation approach
-- Error handling specifics
-- Testing strategy implementation
+- Best approach for semantic type detection
+- Template map schema optimization
+- Error recovery strategies
+- Testing methodology for template analysis

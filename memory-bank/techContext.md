@@ -18,15 +18,17 @@
 pptx-generator/
 ├── pptx_generator/
 │   ├── __init__.py
-│   ├── main.py          # CLI entry point
-│   ├── generator.py     # Core generation logic
-│   ├── utils.py        # Utility functions
-│   ├── data/           # Sample data files
-│   ├── templates/      # Template storage
-│   └── output/         # Generated presentations
-├── tests/              # Test suite
-├── requirements.txt    # Project dependencies
-└── README.md          # Documentation
+│   ├── main.py             # CLI entry point
+│   ├── generator.py        # Core generation logic
+│   ├── template_analyzer.py # Template analysis module
+│   ├── utils.py           # Utility functions
+│   ├── data/              # Sample data files
+│   ├── templates/         # Template storage
+│   └── output/           # Generated presentations
+├── template_map.json     # Template analysis output
+├── tests/               # Test suite
+├── requirements.txt     # Project dependencies
+└── README.md           # Documentation
 ```
 
 ## Dependencies
@@ -37,17 +39,42 @@ click>=8.1.0           # CLI interface
 pytest>=7.0.0          # Testing framework (dev dependency)
 ```
 
+## Key Data Files
+
+### Template Map (template_map.json)
+- Format: JSON
+- Created by: template_analyzer.py
+- Used by: generator.py
+- Purpose: Maps template layouts to semantic types
+- Content:
+  - Layout definitions and properties
+  - Placeholder mappings
+  - Semantic type classifications
+  - Position and dimension information
+
+### Example Data (example_report_data.json)
+- Format: JSON
+- Used by: Main generation process
+- Purpose: Defines presentation content
+- Content:
+  - Semantic content types
+  - Slide content and structure
+  - Image paths and chart data
+
 ## Technical Constraints
 
 ### PowerPoint Template Requirements
 - Must be .pptx format (not .ppt)
-- Should contain named placeholders
-- Must have defined layouts
+- Should contain named placeholders for better mapping
+- Must have defined layouts with clear purposes
 - Should use master slides for consistency
+- Layouts should follow consistent naming patterns
+- Named placeholders preferred over generic indices
 
 ### Input Data Requirements
 - Valid JSON format
-- Must match expected schema
+- Must include content_type field for each section
+- Must match semantic types defined in template map
 - File size limitations apply
 - UTF-8 encoding required
 

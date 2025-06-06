@@ -1,46 +1,53 @@
 {
     "sections": [
         {
-            "layout_name": "Title Slide",
+            "content_type": "presentation_title",
             "title": "Quarterly Business Review",
-            "subtitle": "Performance & Outlook Q2 2025"
+            "subtitle": "Q2 2025 Performance & Strategic Outlook"
         },
         {
-            "layout_name": "Title and Content",
+            "content_type": "bullet_points_summary",
             "title": "Executive Summary",
             "bullets": [
-                "Strong revenue growth across all segments.",
-                "New product launch exceeded expectations.",
-                "Market share increased in key regions."
+                "Revenue growth of 28% YoY, reaching $890M in Q2 2025",
+                "Successfully launched Alpha Series with 95% positive customer feedback",
+                "Market share increased from 23% to 31% in key regions",
+                "Operational efficiency program delivered $45M in cost savings",
+                "Expanded into 3 new international markets",
+                "Customer satisfaction score improved to 4.8/5.0"
             ]
         },
         {
-            "layout_name": "Image Left, Text Right",
+            "content_type": "image_and_description",
             "title": "Marketing Campaign Impact",
-            "image_path": "images/marketing_chart.png",
-            "text_content": "Our targeted digital marketing campaigns resulted in a 35% increase in lead generation and significantly improved brand recall in our target demographics."
+            "image_path": "data/marketing_impact.png",
+            "text_content": "Our reimagined digital marketing strategy delivered exceptional results:\n\n• 35% increase in qualified leads\n• 20% reduction in customer acquisition cost\n• Improved brand awareness and engagement"
         },
         {
-            "layout_name": "Text Left, Image Right",
-            "title": "Operational Efficiency Gains",
-            "text_content": "Streamlined supply chain processes led to a 10% reduction in production costs and improved delivery times. Employee satisfaction also saw a notable rise.",
-            "image_path": "images/efficiency_graph.png"
+            "content_type": "description_and_image",
+            "title": "Operational Excellence",
+            "image_path": "data/operational_excellence.png",
+            "text_content": "Key operational improvements this quarter:\n\n• Supply chain optimization cut costs by 10%\n• Delivery times reduced by 15%\n• Improved inventory management and reduced waste"
         },
         {
-            "layout_name": "Full Width Image with Caption",
+            "content_type": "product_showcase",
             "title": "New Product Launch: Alpha Series",
-            "image_path": "images/alpha_product.png",
-            "caption": "The 'Alpha Series' has been a game-changer, capturing significant market interest."
+            "product_image_path": "data/alpha_series.png",
+            "caption": "The revolutionary Alpha Series has redefined industry standards:\n\n• 5,000+ units sold in first month\n• 4.9/5 customer satisfaction rating\n• Industry-leading performance and features"
         },
         {
-            "layout_name": "Blank",
-            "title": "Sales by Region (Q2 2025)",
+            "content_type": "chart_data_slide",
+            "title": "Q2 2025 Revenue by Region",
             "chart_data": {
-                "categories": ["North America", "Europe", "Asia", "South America"],
+                "categories": ["Americas", "EMEA", "APAC"],
                 "series": [
-                    {"name": "Revenue ($M)", "values": [150, 110, 90, 40]}
+                    {
+                        "name": "Revenue",
+                        "values": [350, 290, 250]
+                    }
                 ]
-            }
+            },
+            "text_content": "Regional revenue growth led by Americas (+28%), followed by EMEA (+22%) and APAC (+18%)"
         }
     ]
 }

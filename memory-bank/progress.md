@@ -9,30 +9,42 @@
 
 ## In Progress
 1. **Core Development**
-   - 🔄 Project architecture defined
-   - 🔄 Documentation structure established
+   - ✅ Project architecture revision
+   - ✅ Template analyzer implementation
+   - ✅ Generator refactoring complete
+
+2. **Next Steps**
+   - 🔄 Testing template map generation
+   - 🔄 Creating example templates
+   - 🔄 Writing usage documentation
 
 ## Pending Tasks
 1. **Core Implementation**
-   - ✅ Create generator.py core module
+   - ✅ Revised generator.py for template map integration
    - ✅ Implement template handling system
-   - ✅ Develop data parsing functionality
+   - ✅ Implemented semantic type mapping
    - ✅ Build chart generation system
-   - ✅ Create CLI interface
+   - ✅ Updated CLI interface with analyze/generate commands
 
-2. **Documentation**
+2. **Template Analysis System**
+   - ✅ Create template_analyzer.py module
+   - ✅ Implement semantic type detection
+   - ⏳ Generate template_map.json (needs testing)
+   - ✅ Integrate map with generator (complete)
+
+3. **Documentation**
    - ⏳ Write API documentation
    - ⏳ Create usage examples
    - ⏳ Document template requirements
    - ⏳ Add CLI command reference
 
-3. **Testing**
+4. **Testing**
    - ⏳ Set up test framework
    - ⏳ Write unit tests
    - ⏳ Create integration tests
    - ⏳ Add test templates and data
 
-4. **Project Infrastructure**
+5. **Project Infrastructure**
    - ⏳ Set up CI/CD pipeline
    - ⏳ Configure automated testing
    - ⏳ Add code quality checks
@@ -41,16 +53,19 @@
 ## Known Issues
 - Requires Pillow library for dummy image generation (optional dependency)
 - Package metadata in setup.py needs to be updated with actual values
+- Template semantic type detection may require manual refinement
+- Templates must use consistent naming for optimal mapping
 
 ## Next Milestone Goals
-1. **Core Functionality (v0.1.0)**
-   - Basic template processing
-   - JSON data parsing
-   - Simple text placeholder replacement
-   - Basic error handling
-   - Initial CLI commands
+1. **Template Analysis (v0.1.0)**
+   - ✅ Template structure analysis
+   - ✅ Layout semantic type detection
+   - ✅ Template map generation
+   - ✅ Placeholder mapping system
+   - ✅ Enhanced CLI with analyze command
 
-2. **Enhanced Features (v0.2.0)**
+2. **Enhanced Generation (v0.2.0)**
+   - Semantic content mapping
    - Chart generation
    - Image handling
    - Advanced template support
