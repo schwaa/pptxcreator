@@ -4,6 +4,8 @@ __pycache__/
 *$py.class
 *.so
 
+projects/*/output/
+
 # Distribution / packaging
 .Python
 build/
