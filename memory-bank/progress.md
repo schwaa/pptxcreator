@@ -1,78 +1,161 @@
 # Project Progress
 
+## Current Focus
+Moving to three-component architecture with AI-powered content processing.
+
 ## Completed Items
 1. **Project Setup**
-   - ✅ Basic directory structure created
-   - ✅ Initial package scaffolding
-   - ✅ Memory bank documentation initialized
-   - ✅ Core utility functions implemented (utils.py)
+   - ✅ Initial repository structure
+   - ✅ Basic documentation framework
+   - ✅ Memory bank initialization
+   - ✅ Core dependencies identified
+
+2. **Architecture**
+   - ✅ Three-component design finalized
+   - ✅ Data contract specifications
+   - ✅ Error handling strategy
+   - ✅ Component interfaces defined
 
 ## In Progress
-1. **Core Development**
-   - ✅ Project architecture revision
-   - ✅ Template analyzer implementation
-   - ✅ Generator refactoring complete
+1. **Template Analysis (analyzer.py)**
+   - 🔄 Layout detection framework
+   - 🔄 Placeholder mapping system
+   - 🔄 layouts.json generation
+   - 🔄 Schema validation
 
-2. **Next Steps**
-   - 🔄 Testing template map generation
-   - 🔄 Creating example templates
-   - 🔄 Writing usage documentation
+2. **Testing Framework**
+   - 🔄 Test structure setup
+   - 🔄 Mock data creation
+   - 🔄 Integration test planning
+   - 🔄 Test documentation
 
 ## Pending Tasks
-1. **Core Implementation**
-   - ✅ Revised generator.py for template map integration
-   - ✅ Implement template handling system
-   - ✅ Implemented semantic type mapping
-   - ✅ Build chart generation system
-   - ✅ Updated CLI interface with analyze/generate commands
 
-2. **Template Analysis System**
-   - ✅ Create template_analyzer.py module
-   - ✅ Implement semantic type detection
-   - ⏳ Generate template_map.json (needs testing)
-   - ✅ Integrate map with generator (complete)
+### Phase 1: Template Analysis
+1. **analyzer.py Implementation**
+   - ⏳ PPTX parsing functionality
+   - ⏳ Layout identification
+   - ⏳ Placeholder detection
+   - ⏳ Schema validation
+   - ⏳ Error handling
+   - ⏳ CLI integration
 
-3. **Documentation**
-   - ⏳ Write API documentation
-   - ⏳ Create usage examples
-   - ⏳ Document template requirements
-   - ⏳ Add CLI command reference
+2. **layouts.json Generation**
+   - ⏳ Schema implementation
+   - ⏳ Validation rules
+   - ⏳ Output formatting
+   - ⏳ Documentation
 
-4. **Testing**
-   - ⏳ Set up test framework
-   - ⏳ Write unit tests
-   - ⏳ Create integration tests
-   - ⏳ Add test templates and data
+### Phase 2: Content Processing
+1. **processor.py Development**
+   - ⏳ Markdown parsing
+   - ⏳ LLM integration
+   - ⏳ Layout selection logic
+   - ⏳ Fallback mechanism
+   - ⏳ Content validation
+   - ⏳ Error handling
 
-5. **Project Infrastructure**
-   - ⏳ Set up CI/CD pipeline
-   - ⏳ Configure automated testing
-   - ⏳ Add code quality checks
-   - ✅ Prepare PyPI packaging (setup.py)
+2. **LLM Integration**
+   - ⏳ API configuration
+   - ⏳ Prompt engineering
+   - ⏳ Response parsing
+   - ⏳ Error recovery
+   - ⏳ Documentation
+
+### Phase 3: Presentation Generation
+1. **generator.py Refactoring**
+   - ⏳ Template loading
+   - ⏳ Content mapping
+   - ⏳ Slide creation
+   - ⏳ Error handling
+   - ⏳ Progress tracking
+
+2. **Output Generation**
+   - ⏳ Slide population
+   - ⏳ Style preservation
+   - ⏳ Resource management
+   - ⏳ Validation checks
+
+### Documentation
+1. **User Guide**
+   - ⏳ Installation instructions
+   - ⏳ Usage examples
+   - ⏳ Template requirements
+   - ⏳ Content guidelines
+
+2. **API Documentation**
+   - ⏳ Component interfaces
+   - ⏳ Data schemas
+   - ⏳ Error codes
+   - ⏳ Configuration options
+
+3. **Developer Guide**
+   - ⏳ Architecture overview
+   - ⏳ Component details
+   - ⏳ Testing guide
+   - ⏳ Contribution guidelines
 
 ## Known Issues
-- Requires Pillow library for dummy image generation (optional dependency)
-- Package metadata in setup.py needs to be updated with actual values
-- Template semantic type detection may require manual refinement
-- Templates must use consistent naming for optimal mapping
+1. **Technical Debt**
+   - Previous generator.py needs refactoring
+   - Test coverage incomplete
+   - Documentation outdated
 
-## Next Milestone Goals
-1. **Template Analysis (v0.1.0)**
-   - ✅ Template structure analysis
-   - ✅ Layout semantic type detection
-   - ✅ Template map generation
-   - ✅ Placeholder mapping system
-   - ✅ Enhanced CLI with analyze command
+2. **Limitations**
+   - Limited template validation
+   - Basic error handling
+   - No progress tracking
 
-2. **Enhanced Generation (v0.2.0)**
-   - Semantic content mapping
-   - Chart generation
-   - Image handling
-   - Advanced template support
-   - Comprehensive error handling
+3. **Dependencies**
+   - OpenAI API key required
+   - Python version requirements
+   - Memory constraints
 
-3. **Production Ready (v1.0.0)**
-   - Complete test coverage
-   - Full documentation
-   - Performance optimization
-   - PyPI distribution
+## Next Milestones
+
+### v0.1.0 - Template Analysis
+- Complete analyzer.py
+- Generate valid layouts.json
+- Basic CLI implementation
+- Initial test suite
+- Target: Week 1-2
+
+### v0.2.0 - Content Processing
+- Implement processor.py
+- LLM integration
+- Fallback mechanisms
+- Enhanced testing
+- Target: Week 3-4
+
+### v0.3.0 - Generation
+- Refactor generator.py
+- Implement new interfaces
+- Complete validation
+- Documentation update
+- Target: Week 5-6
+
+### v1.0.0 - Production Release
+- Full test coverage
+- Complete documentation
+- Performance optimization
+- Example templates
+- Target: Week 7-8
+
+## Future Enhancements
+1. **Advanced Features**
+   - Custom layout detection
+   - Enhanced content analysis
+   - Template suggestions
+   - Batch processing
+
+2. **Performance**
+   - Caching system
+   - Parallel processing
+   - Memory optimization
+   - Progress tracking
+
+3. **User Experience**
+   - Interactive CLI
+   - Template preview
+   - Error recovery
+   - Progress visualization

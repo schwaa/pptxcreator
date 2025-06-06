@@ -3,112 +3,194 @@
 ## Architecture Overview
 ```mermaid
 flowchart TD
-    subgraph Analysis["Template Analysis (One-time)"]
-        Analyzer[Template Analyzer] --> TempMap[Template Map JSON]
+    Input[User Input: Markdown File] --> Analyzer[Template Analyzer]
+    Template[Template PPTX] --> Analyzer
+    Analyzer -->|layouts.json| Processor[Content Processor]
+    Input --> Processor
+    Processor -->|presentation.json| Generator[Presentation Generator]
+    Template --> Generator
+    Generator --> Output[Generated PPTX]
+
+    subgraph Component 1: analyzer.py
+        Analyzer
+        AnalyzerValidation[Layout Validation]
+        LayoutMapping[Layout Mapping]
     end
-    
-    subgraph Generation["Presentation Generation (Runtime)"]
-        CLI[CLI Interface] --> Generator[Generator Core]
-        Generator --> TemplateHandler[Template Handler]
-        Generator --> DataHandler[Data Handler]
-        Generator --> ChartBuilder[Chart Builder]
-        
-        TempMap -.-> Generator
-        TemplateHandler --> FileOps[File Operations]
-        DataHandler --> FileOps
-        ChartBuilder --> FileOps
-        
-        FileOps --> Output[Generated PPTX]
+
+    subgraph Component 2: processor.py
+        Processor
+        LLMAnalysis[LLM Content Analysis]
+        Fallback[Rule-based Fallback]
+        ContentValidation[Content Validation]
+    end
+
+    subgraph Component 3: generator.py
+        Generator
+        SlideCreation[Slide Creation]
+        ContentPopulation[Content Population]
+        OutputValidation[Output Validation]
     end
 ```
 
-## Component Relationships
+## Component Specifications
 
-### 1. Template Analyzer (template_analyzer.py)
-- Analyzes PowerPoint template structure
-- Identifies layouts and their semantic types
-- Maps placeholders and their properties
-- Generates template_map.json configuration
+### 1. Template Analyzer (`analyzer.py`)
+- **Purpose:** Extract and validate template layout information
+- **Functions:**
+  - Load and parse PPTX templates
+  - Identify available layouts
+  - Map placeholder locations
+  - Generate layouts.json
+- **Error Handling:**
+  - Template format validation
+  - Layout accessibility checks
+  - Placeholder verification
+  - Schema validation
 
-### 2. CLI Interface (main.py)
-- Provides analyze and generate subcommands
-- Handles command-line arguments and user interaction
-- Validates input parameters and paths
-- Orchestrates analysis and generation processes
-- Provides progress feedback and error messages
+### 2. Content Processor (`processor.py`)
+- **Purpose:** Analyze content and map to layouts
+- **Functions:**
+  - Parse markdown input
+  - Interface with LLM service
+  - Select appropriate layouts
+  - Generate presentation.json
+- **Error Handling:**
+  - LLM service fallback
+  - Content validation
+  - Layout compatibility checks
+  - Schema enforcement
 
-### 3. Generator Core (generator.py)
-- Uses template_map.json for layout decisions
-- Coordinates between components
-- Manages the presentation generation workflow
-- Maps semantic content types to layouts
-- Validates data against template structure
+### 3. Presentation Generator (`generator.py`)
+- **Purpose:** Create final presentation
+- **Functions:**
+  - Load template and content
+  - Create and populate slides
+  - Apply styling and formatting
+  - Save final PPTX
+- **Error Handling:**
+  - Input validation
+  - Template consistency
+  - Resource verification
+  - Output validation
 
-### 4. Template Handler
-- Loads and parses PowerPoint templates
-- Identifies placeholder locations and types
-- Manages slide layouts and master slides
-- Ensures template integrity
+## Data Contracts
 
-### 5. Data Handler
-- Parses JSON input data
-- Validates data structure
-- Maps data to template placeholders
-- Handles data type conversions
+### 1. layouts.json
+**Purpose:** Define available template layouts and capabilities
+```json
+{
+  "layouts": [
+    {
+      "name": "Title Slide",
+      "placeholders": [
+        "Title 1",
+        "Subtitle 2"
+      ]
+    },
+    {
+      "name": "Title and Content",
+      "placeholders": [
+        "Title 1",
+        "Content Placeholder 2"
+      ]
+    },
+    {
+      "name": "Section Header",
+      "placeholders": [
+        "Title 1"
+      ]
+    }
+  ]
+}
+```
 
-### 6. Chart Builder
-- Creates charts from structured data
-- Handles different chart types
-- Manages chart styling and formatting
-- Integrates charts into slides
-
-### 7. File Operations
-- Manages file I/O operations
-- Handles path resolution
-- Implements error handling for file operations
-- Manages temporary files and cleanup
-
-## Key Data Artifacts
-
-1. **Template Map (template_map.json)**
-   - Structured mapping of template layouts
-   - Semantic type classifications
-   - Placeholder details and properties
-   - Created by template_analyzer.py
-   - Used by generator.py at runtime
-
-2. **Data Input (example_report_data.json)**
-   - Structured content definitions
-   - Semantic content type specifications
-   - Text, images, and chart data
-   - Maps to template layouts via semantic types
+### 2. presentation.json
+**Purpose:** Define presentation content and structure
+```json
+{
+  "slides": [
+    {
+      "layout": "Title Slide",
+      "content": {
+        "Title 1": "The Future of AI",
+        "Subtitle 2": "A Presentation by Jane Doe"
+      }
+    },
+    {
+      "layout": "Title and Content",
+      "content": {
+        "Title 1": "Key Developments",
+        "Content Placeholder 2": "- Rise of Transformers\n- Open Source Models\n- Multimodal Capabilities"
+      }
+    }
+  ]
+}
+```
 
 ## Design Patterns
 
-1. **Factory Pattern**
-   - Used for creating different types of content handlers
-   - Supports extensibility for new content types
+### 1. Strategy Pattern
+- Applied in Content Processor for analysis methods:
+  - LLM-based analysis (primary)
+  - Rule-based analysis (fallback)
+  - Custom analysis plugins (future)
 
-2. **Strategy Pattern**
-   - Applied to chart generation
-   - Allows for different chart creation strategies
+### 2. Factory Pattern
+- Used for slide creation in Generator:
+  - Different slide types
+  - Layout-specific handling
+  - Content type factories
 
-3. **Template Method Pattern**
-   - Used in the core generator workflow
-   - Defines skeleton of operations
+### 3. Facade Pattern
+- Simplifies complex operations behind CLI
+- Hides component interaction details
+- Provides unified error handling
 
-4. **Facade Pattern**
-   - Simplifies complex operations behind CLI
-   - Provides unified interface to subsystems
+### 4. Template Method Pattern
+- Defines core generation workflow
+- Allows customization of specific steps
+- Maintains consistent process
 
 ## Error Handling Strategy
-- Comprehensive error messages
-- Graceful failure handling
-- User-friendly error reporting
-- Recovery mechanisms where possible
+
+### 1. Validation Layers
+- **Template Analysis:**
+  - PPTX format verification
+  - Layout accessibility
+  - Placeholder presence
+  
+- **Content Processing:**
+  - Markdown parsing
+  - LLM response validation
+  - Layout compatibility
+  
+- **Generation:**
+  - Resource availability
+  - Content mapping
+  - Output verification
+
+### 2. Fallback Mechanisms
+- LLM service unavailable → Rule-based processing
+- Complex layout unavailable → Default layout
+- Image missing → Placeholder or skip
+- Chart data invalid → Text representation
 
 ## Performance Considerations
+
+### 1. Resource Management
 - Efficient template parsing
 - Optimized file operations
-- Memory management for large presentations
-- Progress tracking for long operations
+- Memory-conscious processing
+- Cleanup of temporary files
+
+### 2. Progress Tracking
+- Component-level progress
+- Operation status updates
+- Time remaining estimates
+- Resource usage monitoring
+
+### 3. Optimization Strategies
+- Template caching
+- Layout preprocessing
+- Batch operations
+- Parallel processing where possible
