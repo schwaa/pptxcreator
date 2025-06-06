@@ -1,167 +1,154 @@
 import os
 import json
-import argparse
-import logging
+import re
 from openai import OpenAI
+from dotenv import load_dotenv
 
-logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
-
-# This prompt template is critical for guiding the LLM's response format
-PROMPT_TEMPLATE = """
-You are an expert presentation designer's assistant. Your task is to convert raw Markdown content into a structured JSON object for a PowerPoint generator.
-
-You will be given the user's Markdown content and a JSON object describing the available slide layouts in the PowerPoint template.
-
-Your goal is to:
-1.  Read the Markdown and split it into logical slides.
-2.  For each slide, choose the most appropriate layout from the available layouts.
-3.  Create a JSON object for each slide that specifies the chosen layout and maps the slide's content to the correct placeholder names for that layout.
-
-**RULES FOR YOUR RESPONSE:**
-- Your entire output MUST be a single, valid JSON object and nothing else. Do not include any introductory text, explanations, or code formatting like ```json.
-- The root of the JSON object must be a key named "slides", which is an array of slide objects.
-- Each slide object in the array must have two keys: "layout" and "content".
-- The "layout" value must be a string that EXACTLY matches one of the layout names from the provided available layouts.
-- The "content" value must be a dictionary. The keys of this dictionary MUST EXACTLY match the placeholder names (e.g., "Title 1", "Content Placeholder 2", "Picture Placeholder 7") available for the chosen layout.
-- If the Markdown references an image (e.g., ![alt text](path/to/image.png)), the value for the corresponding picture placeholder should be the image path string: "path/to/image.png".
-
----
-**AVAILABLE LAYOUTS:**
-{layouts_json}
-
----
-**MARKDOWN CONTENT:**
-{markdown_content}
----
-
-Now, generate the JSON object based on the rules and content above.
-"""
-
-def simple_fallback_parser(markdown_content: str, layouts: dict) -> dict:
+# Fallback parser for when LLM fails or is unavailable
+def fallback_parser(markdown_content):
     """
-    A non-AI fallback that splits Markdown by '---' and uses a default layout.
-    This makes the tool more robust if the LLM fails.
+    Simple fallback: splits markdown into slides by '---' and uses a default layout.
     """
-    logging.warning("LLM processing failed. Falling back to simple parser.")
-    
-    # Try to find a "Title and Content" layout, otherwise grab the second layout available
-    default_layout_name = "Title and Content"
-    title_placeholder = "Title 1"
-    body_placeholder = "Content Placeholder 2"
-
-    layout_found = False
-    for layout in layouts.get('layouts', []):
-        if layout['name'] == default_layout_name:
-            # Find the most common placeholder names
-            for p_name in layout['placeholders']:
-                if 'title' in p_name.lower():
-                    title_placeholder = p_name
-                elif 'content' in p_name.lower() or 'body' in p_name.lower():
-                    body_placeholder = p_name
-            layout_found = True
-            break
-    
-    if not layout_found and len(layouts.get('layouts', [])) > 1:
-        # Fallback to just using the second layout in the list (first is often title-only)
-        default_layout_name = layouts['layouts'][1]['name']
-        title_placeholder = layouts['layouts'][1]['placeholders'][0]
-        body_placeholder = layouts['layouts'][1]['placeholders'][1]
-
-    presentation_data = {"slides": []}
-    slides = markdown_content.split('\n---\n') # Split by horizontal rule
-
-    for slide_md in slides:
-        lines = slide_md.strip().split('\n')
-        title = lines[0].lstrip('# ').strip()
-        body = "\n".join(lines[1:]).strip()
-
-        slide_obj = {
-            "layout": default_layout_name,
+    slides = []
+    for slide_md in markdown_content.split('---'):
+        slide_md = slide_md.strip()
+        if not slide_md:
+            continue
+        lines = slide_md.splitlines()
+        title = lines[0].strip('# ').strip() if lines else ""
+        body = "\n".join(lines[1:]).strip() if len(lines) > 1 else ""
+        # If body is empty, make up some content
+        if not body:
+            body = "This is sample body text generated to ensure the slide is not empty. Add your own content here."
+        slides.append({
+            "layout": "Title and Content",
             "content": {
-                title_placeholder: title,
-                body_placeholder: body
+                "Title 1": title,
+                "Content Placeholder 2": body
             }
-        }
-        presentation_data["slides"].append(slide_obj)
-        
-    logging.info(f"Fallback parser created {len(presentation_data['slides'])} slides.")
-    return presentation_data
+        })
+    return {"slides": slides}
 
-def process_content(markdown_file: str, layouts_file: str, output_file: str, api_key: str):
+def extract_json_from_response(response_content):
     """
-    Reads markdown and layout files, calls an LLM to generate a presentation plan,
-    and saves it as a JSON file.
+    Extracts the first JSON object from a string, even if wrapped in Markdown code fences or with extra text.
     """
+    # Try to find a JSON code block
+    code_block = re.search(r"```(?:json)?\s*({.*?})\s*```", response_content, re.DOTALL)
+    if code_block:
+        json_str = code_block.group(1)
+    else:
+        # Fallback: find the first {...} block
+        json_match = re.search(r"({.*})", response_content, re.DOTALL)
+        if json_match:
+            json_str = json_match.group(1)
+        else:
+            json_str = response_content  # Last resort, try the whole thing
+    return json_str
+
+def call_llm(system_prompt, user_prompt, model_name=None):
+    """
+    Calls the LLM (OpenRouter) to process the content.
+    """
+    openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
+
+    if not openrouter_api_key:
+        print("Error: OPENROUTER_API_KEY not found in environment variables.")
+        print("Please ensure it's set in your .env file or environment.")
+        return None
+
+    client = OpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=openrouter_api_key,
+    )
+    
+    chosen_model = model_name or "nousresearch/nous-hermes-2-mixtral-8x7b-dpo"
+    print(f"Using OpenRouter API with model: {chosen_model}")
+
     try:
-        with open(markdown_file, 'r', encoding='utf-8') as f:
+        completion = client.chat.completions.create(
+            model=chosen_model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ]
+        )
+        response_content = completion.choices[0].message.content
+        # Try to extract JSON robustly
+        json_str = extract_json_from_response(response_content)
+        return json.loads(json_str)
+    except json.JSONDecodeError as e:
+        print(f"LLM output was not valid JSON: {e}")
+        print(f"LLM Raw Response: {response_content}")
+        return None
+    except Exception as e:
+        print(f"Error calling OpenRouter LLM: {e}")
+        return None
+
+def process_content(markdown_filepath, layouts_filepath, output_filepath, api_key_unused=None, model_name=None):
+    """
+    Processes markdown content and a layouts map to produce a structured
+    presentation plan using an LLM (OpenRouter).
+    """
+    load_dotenv()  # Load .env file
+
+    # Read markdown content
+    try:
+        with open(markdown_filepath, 'r', encoding='utf-8') as f:
             markdown_content = f.read()
-    except FileNotFoundError:
-        logging.error(f"Markdown file not found: {markdown_file}")
+    except Exception as e:
+        print(f"Error reading markdown file: {e}")
         return
 
+    # Read layouts.json
     try:
-        with open(layouts_file, 'r', encoding='utf-8') as f:
-            layouts_data = json.load(f)
-    except FileNotFoundError:
-        logging.error(f"Layouts file not found: {layouts_file}")
+        with open(layouts_filepath, 'r', encoding='utf-8') as f:
+            layouts_content = f.read()
+    except Exception as e:
+        print(f"Error reading layouts file: {e}")
         return
 
-    layouts_json_str = json.dumps(layouts_data, indent=2)
-
-    # 1. Construct the prompt
-    prompt = PROMPT_TEMPLATE.format(
-        layouts_json=layouts_json_str,
-        markdown_content=markdown_content
+    # Build prompts
+    system_prompt = (
+        "You are an expert presentation designer. "
+        "Given a markdown document and a list of available PowerPoint slide layouts (with their placeholder names), "
+        "your job is to create a JSON plan for a presentation. "
+        "For each slide, select the most appropriate layout and map content to the correct placeholders by name. "
+        "For any slide that has a content/body placeholder (such as 'Content Placeholder 2', 'Content Placeholder 6', or 'Content Placeholder 7'), "
+        "ALWAYS provide meaningful body text, even if you have to make it up. "
+        "If the original markdown is brief, elaborate or invent relevant details to ensure every slide is full and engaging. "
+        "Output a JSON object with a 'slides' array, where each slide has a 'layout' and a 'content' dict mapping placeholder names to values. "
+        "Respond ONLY with the JSON object, no explanation or markdown formatting."
+    )
+    user_prompt = (
+        f"Markdown Content:\n{markdown_content}\n\n"
+        f"Available Layouts:\n{layouts_content}\n\n"
+        "Please generate the presentation plan as described."
     )
 
-    presentation_data = None
-    try:
-        # 2. Call the LLM
-        logging.info("Sending request to LLM. This may take a moment...")
-        client = OpenAI(api_key=api_key)
-        response = client.chat.completions.create(
-            model="gpt-4-turbo",  # Or another model like "gpt-3.5-turbo"
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.2, # Lower temperature for more deterministic, structured output
-            response_format={"type": "json_object"} # Use JSON mode if available
-        )
-        response_content = response.choices[0].message.content
-        logging.info("LLM response received.")
+    llm_response = call_llm(system_prompt, user_prompt, model_name=model_name)
 
-        # 3. Parse and validate the response
-        presentation_data = json.loads(response_content)
-        # Basic validation
-        if 'slides' not in presentation_data or not isinstance(presentation_data['slides'], list):
-            raise ValueError("LLM output is missing 'slides' array.")
-        logging.info(f"LLM successfully generated {len(presentation_data['slides'])} slides.")
-
-    except Exception as e:
-        logging.error(f"An error occurred during LLM processing: {e}")
-        # 4. Use the fallback if the LLM fails
-        presentation_data = simple_fallback_parser(markdown_content, layouts_data)
-
-    # 5. Write the output file
-    with open(output_file, 'w', encoding='utf-8') as f:
-        json.dump(presentation_data, f, indent=2, ensure_ascii=False)
-    
-    logging.info(f"Presentation plan saved successfully to {output_file}")
-
-def main():
-    """Main entry point for the processor script."""
-    parser = argparse.ArgumentParser(description="Process Markdown content into a presentation.json file using an LLM.")
-    parser.add_argument('--markdown', required=True, help="Path to the input Markdown file.")
-    parser.add_argument('--layouts', required=True, help="Path to the layouts.json file.")
-    parser.add_argument('--output', default='presentation.json', help="Path for the output presentation.json file.")
-    parser.add_argument('--api-key', help="Your OpenAI API key. Can also be set via OPENAI_API_KEY environment variable.")
-    
-    args = parser.parse_args()
-
-    # Get API key from argument or environment variable
-    api_key = args.api_key or os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        logging.error("API Key is required. Please provide it with --api-key or set OPENAI_API_KEY.")
+    if llm_response:
+        # Ensure the output structure is {"slides": [...]}
+        if "slides" not in llm_response:
+            print("LLM response is missing the 'slides' key. Using fallback.")
+            presentation_structure = fallback_parser(markdown_content)
+        else:
+            # Enhance: If any slide is missing body text, make up something
+            for slide in llm_response.get("slides", []):
+                placeholders = slide.get("content", {})
+                # Check for common content placeholders
+                for key in ["Content Placeholder 2", "Content Placeholder 6", "Content Placeholder 7"]:
+                    if key in placeholders and (not placeholders[key] or not placeholders[key].strip()):
+                        placeholders[key] = "This is sample body text generated to ensure the slide is not empty. Add your own content here."
+            presentation_structure = llm_response
     else:
-        process_content(args.markdown, args.layouts, args.output, api_key)
-
-if __name__ == '__main__':
-    main()
+        print("LLM processing failed. Falling back to simple parser.")
+        presentation_structure = fallback_parser(markdown_content)
+    
+    try:
+        with open(output_filepath, 'w', encoding='utf-8') as f:
+            json.dump(presentation_structure, f, indent=2)
+        print(f"Presentation plan saved to {output_filepath}")
+    except Exception as e:
+        print(f"Error saving presentation plan: {e}")
