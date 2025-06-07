@@ -4,6 +4,37 @@ import re
 from openai import OpenAI
 from dotenv import load_dotenv
 
+PROMPT_TEMPLATE = """
+You are an expert presentation designer's assistant. Your task is to convert raw Markdown content into a structured JSON object for a PowerPoint generator.
+
+You will be given the user's Markdown content and a JSON object describing the available slide layouts in the PowerPoint template.
+
+Your goal is to:
+1.  Read the Markdown and split it into logical slides.
+2.  For each slide, choose the most appropriate layout from the available layouts.
+3.  **IMPORTANT: If a section of text is a dense paragraph, reformat it into 3-5 concise, easy-to-read bullet points. Each bullet point should start with a standard dash (-) or asterisk (*).**
+4.  Create a JSON object for each slide that specifies the chosen layout and maps the slide's content to the correct placeholder names for that layout.
+
+**RULES FOR YOUR RESPONSE:**
+- Your entire output MUST be a single, valid JSON object and nothing else. Do not include any introductory text, explanations, or code formatting like ```json.
+- The root of the JSON object must be a key named "slides", which is an array of slide objects.
+- Each slide object in the array must have two keys: "layout" and "content".
+- The "layout" value must be a string that EXACTLY matches one of the layout names from the provided available layouts.
+- The "content" value must be a dictionary. The keys of this dictionary MUST EXACTLY match the placeholder names (e.g., "Title 1", "Content Placeholder 2", "Picture Placeholder 7") available for the chosen layout.
+- If the Markdown references an image (e.g., ![alt text](path/to/image.png)), the value for the corresponding picture placeholder should be the image path string: "path/to/image.png".
+
+---
+**AVAILABLE LAYOUTS:**
+{layouts_json}
+
+---
+**MARKDOWN CONTENT:**
+{markdown_content}
+---
+
+Now, generate the JSON object based on the rules and content above.
+"""
+
 # Fallback parser for when LLM fails or is unavailable
 def fallback_parser(markdown_content):
     """
@@ -62,7 +93,7 @@ def call_llm(system_prompt, user_prompt, model_name=None):
         api_key=openrouter_api_key,
     )
     
-    chosen_model = model_name or "nousresearch/nous-hermes-2-mixtral-8x7b-dpo"
+    chosen_model = model_name or "deepseek/deepseek-chat-v3-0324:free" # Updated default model
     print(f"Using OpenRouter API with model: {chosen_model}")
 
     try:
@@ -110,20 +141,11 @@ def process_content(markdown_filepath, layouts_filepath, output_filepath, api_ke
 
     # Build prompts
     system_prompt = (
-        "You are an expert presentation designer. "
-        "Given a markdown document and a list of available PowerPoint slide layouts (with their placeholder names), "
-        "your job is to create a JSON plan for a presentation. "
-        "For each slide, select the most appropriate layout and map content to the correct placeholders by name. "
-        "For any slide that has a content/body placeholder (such as 'Content Placeholder 2', 'Content Placeholder 6', or 'Content Placeholder 7'), "
-        "ALWAYS provide meaningful body text, even if you have to make it up. "
-        "If the original markdown is brief, elaborate or invent relevant details to ensure every slide is full and engaging. "
-        "Output a JSON object with a 'slides' array, where each slide has a 'layout' and a 'content' dict mapping placeholder names to values. "
-        "Respond ONLY with the JSON object, no explanation or markdown formatting."
+        "You are an AI assistant. Please follow the user's instructions carefully to generate the requested JSON output."
     )
-    user_prompt = (
-        f"Markdown Content:\n{markdown_content}\n\n"
-        f"Available Layouts:\n{layouts_content}\n\n"
-        "Please generate the presentation plan as described."
+    user_prompt = PROMPT_TEMPLATE.format(
+        layouts_json=layouts_content, 
+        markdown_content=markdown_content
     )
 
     llm_response = call_llm(system_prompt, user_prompt, model_name=model_name)
@@ -149,6 +171,6 @@ def process_content(markdown_filepath, layouts_filepath, output_filepath, api_ke
     try:
         with open(output_filepath, 'w', encoding='utf-8') as f:
             json.dump(presentation_structure, f, indent=2)
-        print(f"Presentation plan saved to {output_filepath}")
+        print(f"Success! Presentation plan saved to {output_filepath}")
     except Exception as e:
         print(f"Error saving presentation plan: {e}")

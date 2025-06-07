@@ -49,14 +49,14 @@ Moving to three-component architecture with AI-powered content processing.
 ### Phase 2: Content Processing
 1. **processor.py Development**
    - ⏳ Markdown parsing
-   - ⏳ LLM integration
+   - ⏳ LLM integration (OpenRouter, model: deepseek/deepseek-chat-v3-0324:free)
    - ⏳ Layout selection logic
    - ⏳ Fallback mechanism
    - ⏳ Content validation
    - ⏳ Error handling
 
 2. **LLM Integration**
-   - ⏳ API configuration
+   - ⏳ API configuration (OpenRouter, model: deepseek/deepseek-chat-v3-0324:free)
    - ⏳ Prompt engineering
    - ⏳ Response parsing
    - ⏳ Error recovery
@@ -107,7 +107,7 @@ Moving to three-component architecture with AI-powered content processing.
    - No progress tracking
 
 3. **Dependencies**
-   - OpenAI API key required
+   - OpenRouter API key required (for model deepseek/deepseek-chat-v3-0324:free)
    - Python version requirements
    - Memory constraints
 
@@ -122,7 +122,7 @@ Moving to three-component architecture with AI-powered content processing.
 
 ### v0.2.0 - Content Processing
 - Implement processor.py
-- LLM integration
+- LLM integration (OpenRouter, model: deepseek/deepseek-chat-v3-0324:free)
 - Fallback mechanisms
 - Enhanced testing
 - Target: Week 3-4

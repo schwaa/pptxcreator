@@ -7,7 +7,7 @@ The PPTX Generator exists to solve the challenge of automating PowerPoint presen
 Currently, the tool uses a predefined JSON file to populate a PowerPoint template, focusing on validating the generation logic and template mapping.
 
 **Future Vision:**  
-The ultimate goal is to allow users to supply a block of text or a markdown file. The system will use AI to analyze and segment the content, select optimal layouts, and generate the intermediate JSON data file for presentation generation.
+The ultimate goal is to allow users to supply a block of text or a markdown file. The system will use an LLM via OpenRouter (model: deepseek/deepseek-chat-v3-0324:free) to analyze and segment the content, select optimal layouts, and generate the intermediate JSON data file for presentation generation.
 
 ## Problems Solved
 1. Manual PowerPoint Creation Overhead

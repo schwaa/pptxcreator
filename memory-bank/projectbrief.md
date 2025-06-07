@@ -10,7 +10,7 @@ The `pptx-generator` is an open-source command-line interface (CLI) tool designe
    - Generates machine-readable layout definitions
 
 2. **Content Processor (`processor.py`)**
-   - Analyzes markdown content using LLM
+   - Analyzes markdown content using LLM (via OpenRouter, model: deepseek/deepseek-chat-v3-0324:free)
    - Intelligently segments content into slides
    - Maps content to appropriate layouts
 
@@ -22,7 +22,7 @@ The `pptx-generator` is an open-source command-line interface (CLI) tool designe
 ## Key Features
 
 1. **Intelligent Content Analysis**
-   - LLM-powered content segmentation
+   - LLM-powered content segmentation (via OpenRouter, model: deepseek/deepseek-chat-v3-0324:free)
    - Smart layout selection
    - Fallback to rule-based processing
    - Content type detection and mapping

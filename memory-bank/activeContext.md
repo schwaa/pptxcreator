@@ -43,7 +43,7 @@ def process_content(markdown_path: str, layouts_path: str) -> Dict[str, Any]:
     Process markdown and generate presentation.json
     """
     # 1. Parse markdown
-    # 2. Analyze with LLM
+    # 2. Analyze with LLM (OpenRouter, model: deepseek/deepseek-chat-v3-0324:free)
     # 3. Select layouts
     # 4. Generate structure
     # 5. Validate output
@@ -112,7 +112,7 @@ def generate_presentation(template_path: str, content_path: str) -> str:
 
 ### 2. Technical Challenges
 - Layout detection accuracy
-- LLM integration stability
+- LLM integration stability (OpenRouter, model: deepseek/deepseek-chat-v3-0324:free)
 - Error recovery strategies
 - Performance optimization
 

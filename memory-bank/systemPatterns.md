@@ -19,7 +19,7 @@ flowchart TD
 
     subgraph Component 2: processor.py
         Processor
-        LLMAnalysis[LLM Content Analysis]
+        LLMAnalysis[LLM Content Analysis via OpenRouter (deepseek/deepseek-chat-v3-0324:free)]
         Fallback[Rule-based Fallback]
         ContentValidation[Content Validation]
     end
@@ -51,11 +51,11 @@ flowchart TD
 - **Purpose:** Analyze content and map to layouts
 - **Functions:**
   - Parse markdown input
-  - Interface with LLM service
+  - Interface with LLM service (OpenRouter, model: deepseek/deepseek-chat-v3-0324:free)
   - Select appropriate layouts
   - Generate presentation.json
 - **Error Handling:**
-  - LLM service fallback
+  - LLM service fallback (OpenRouter)
   - Content validation
   - Layout compatibility checks
   - Schema enforcement
@@ -131,7 +131,7 @@ flowchart TD
 
 ### 1. Strategy Pattern
 - Applied in Content Processor for analysis methods:
-  - LLM-based analysis (primary)
+  - LLM-based analysis (primary, via OpenRouter: deepseek/deepseek-chat-v3-0324:free)
   - Rule-based analysis (fallback)
   - Custom analysis plugins (future)
 
@@ -161,7 +161,7 @@ flowchart TD
   
 - **Content Processing:**
   - Markdown parsing
-  - LLM response validation
+  - LLM response validation (from OpenRouter)
   - Layout compatibility
   
 - **Generation:**
@@ -170,7 +170,7 @@ flowchart TD
   - Output verification
 
 ### 2. Fallback Mechanisms
-- LLM service unavailable → Rule-based processing
+- LLM service (OpenRouter) unavailable → Rule-based processing
 - Complex layout unavailable → Default layout
 - Image missing → Placeholder or skip
 - Chart data invalid → Text representation

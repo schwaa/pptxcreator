@@ -5,7 +5,7 @@
 ### Core Technologies
 - Python 3.13+
 - python-pptx library (PowerPoint manipulation)
-- OpenAI API (content analysis)
+- OpenRouter API (content analysis, using model deepseek/deepseek-chat-v3-0324:free)
 - Pillow library (image handling)
 - Click library (CLI interface)
 
@@ -53,7 +53,10 @@ pptx-generator/
 ### Production Dependencies
 ```
 python-pptx>=0.6.21    # PowerPoint file manipulation
-openai>=1.0.0          # OpenAI API client
+# openai>=1.0.0        # OpenAI API client (Potentially still used if OpenRouter is OpenAI-compatible, or requests library for direct API calls)
+# User specified OpenRouter with model deepseek/deepseek-chat-v3-0324:free
+# Assuming requests library will be used for OpenRouter if a dedicated client isn't specified.
+# The 'requests' library is already listed.
 markdown>=3.4.0        # Markdown parsing
 Pillow>=10.0.0        # Image processing
 click>=8.1.0          # CLI framework
@@ -153,7 +156,7 @@ class Presentation(BaseModel):
 4. Configure Environment:
    ```bash
    cp .env.example .env
-   # Edit .env with your OpenAI API key
+   # Edit .env with your OpenRouter API key
    ```
 
 5. Run Tests:
@@ -171,7 +174,7 @@ class Presentation(BaseModel):
    - Resource availability
 
 2. Process Validation
-   - LLM responses
+   - LLM responses (from OpenRouter)
    - Layout compatibility
    - Content mapping
    - Resource usage

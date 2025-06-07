@@ -21,7 +21,35 @@
 - For dummy image generation, ensure the `Pillow` library is used and handle its potential absence gracefully
 - Ensure the virtual environment is created and activated before installing dependencies or running the project
 - Explicitly use `python3.13` (or the confirmed installed version) for virtual environment creation
+- The project now uses OpenRouter for LLM access, specifically the model `deepseek/deepseek-chat-v3-0324:free`. Ensure all references to LLM services reflect this. The API key for OpenRouter should be configured in the `.env` file.
 
 ## Documentation and Version Control
 - Maintain a consistent and helpful tone in all user-facing output and documentation
 - For Git commits, use conventional commits (e.g., 'feat:', 'fix:', 'docs:') for clarity
+
+## Pytest Testing Conventions
+- **File Naming:** Test files should be named `test_*.py` or `*_test.py` and located in the `tests/` directory.
+- **Function Naming:** Test functions should be prefixed with `test_` (e.g., `def test_my_function():`).
+- **Structure (Arrange-Act-Assert):**
+    - **Arrange:** Set up the test conditions (e.g., prepare input data, mock objects, create fixture files).
+    - **Act:** Execute the code being tested.
+    - **Assert:** Verify that the outcome is as expected.
+- **Assertions:**
+    - Use descriptive assertion messages (e.g., `assert result == expected, f"Expected {expected}, but got {result}"`).
+    - For functions that are expected to return data (like `analyzer.py`'s `analyze_template`), assert against the returned data directly.
+    - For functions that are expected to raise exceptions, use `pytest.raises` (e.g., `with pytest.raises(ValueError):`).
+- **Fixtures:**
+    - Use Pytest fixtures (`@pytest.fixture`) for reusable setup code (e.g., creating temporary files, directories, or complex objects).
+    - Place test-specific fixture files (e.g., sample `.pptx` templates, `.md` files) in a `tests/fixtures/` subdirectory (e.g., `tests/fixtures/templates/`, `tests/fixtures/markdown/`).
+    - Use `pathlib.Path` for constructing paths to fixture files to ensure cross-platform compatibility (e.g., `FIXTURES_DIR = Path(__file__).parent / "fixtures"`).
+- **Skipping Tests:**
+    - Use `pytest.skip("Reason for skipping")` for tests that are not yet implemented or temporarily disabled. Provide a clear reason.
+- **Clarity and Isolation:**
+    - Each test should be independent and test one specific aspect or behavior.
+    - Avoid overly complex tests; break them down if necessary.
+- **Running Tests:**
+    - Ensure the virtual environment is activated and development dependencies (including `pytest` from `requirements-dev.txt`) are installed before running tests.
+    - Run all tests with `pytest` from the project root.
+    - Run specific test files with `pytest path/to/test_file.py`.
+    - Run specific tests with `pytest path/to/test_file.py::test_function_name`.
+- **Test Coverage:** Aim for high test coverage. Consider using `pytest-cov` to measure coverage.
