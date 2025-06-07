@@ -1,55 +1,72 @@
 # Project Rules and Conventions
 
 ## Code Structure and Organization
-- Adhere strictly to the project structure defined in the instructions
-- Prioritize modularity: Separate core logic (generator.py) from utilities (utils.py) and the CLI (main.py)
-- When creating new files, ensure correct directory placement
+- Adhere strictly to the project structure defined in the instructions.
+- Prioritize modularity: Separate core logic (`analyzer.py`, `processor.py`, `generator.py`) from utilities (`utils.py`) and the CLI (`main.py`).
+- When creating new files, ensure correct directory placement.
 
 ## Coding Standards
-- Implement robust error handling for file operations (reading data, loading templates, saving output)
-- Provide clear, actionable error messages
-- Ensure all Python code follows PEP 8 style guidelines
-- Use f-strings for clear and efficient string formatting
-- Provide informative print statements to indicate progress and warnings during execution
+- Implement robust error handling for file operations (reading data, loading templates, saving output).
+- Provide clear, actionable error messages.
+- Ensure all Python code follows PEP 8 style guidelines.
+- Use f-strings for clear and efficient string formatting.
+- Provide informative print statements for CLI user feedback and `logging` for internal/debug information.
+- Use `ast.literal_eval` for safely parsing stringified Python literals (e.g., lists) from LLM responses.
 
 ## File and Path Handling
-- Always use absolute or relative paths carefully to ensure files are found regardless of execution context
-- For placeholder identification, prioritize finding by 'name' (if named in template) over 'index' for greater robustness
+- Always use `os.path.join` for constructing paths to ensure cross-platform compatibility.
+- `main.py` resolves template paths for `analyze` and `generate` commands.
+    - `analyze` command: template can be a direct path or a name in `templates/`.
+    - `generate` command: template path is sourced from `source_template_path` within the project's `layouts.json`.
+- Image paths in `presentation.json` are currently relative and resolved by `generator.py` (basic resolution, needs enhancement).
 
 ## Dependencies and Environment
-- When adding dependencies, specify them clearly in `requirements.txt`
-- For dummy image generation, ensure the `Pillow` library is used and handle its potential absence gracefully
-- Ensure the virtual environment is created and activated before installing dependencies or running the project
-- Explicitly use `python3.13` (or the confirmed installed version) for virtual environment creation
-- The project now uses OpenRouter for LLM access, specifically the model `deepseek/deepseek-chat-v3-0324:free`. Ensure all references to LLM services reflect this. The API key for OpenRouter should be configured in the `.env` file.
+- When adding dependencies, specify them clearly in `requirements.txt`.
+- The project uses OpenRouter for LLM access, specifically the model `deepseek/deepseek-chat-v3-0324:free`. Ensure all references to LLM services reflect this. The API key for OpenRouter should be configured in the `.env` file.
+- The `openai` library is used as the client for OpenRouter.
 
 ## Documentation and Version Control
-- Maintain a consistent and helpful tone in all user-facing output and documentation
-- For Git commits, use conventional commits (e.g., 'feat:', 'fix:', 'docs:') for clarity
+- Maintain a consistent and helpful tone in all user-facing output and documentation.
+- For Git commits, use conventional commits (e.g., 'feat:', 'fix:', 'docs:') for clarity.
+
+## JSON Data Structures
+- **`layouts.json`**:
+    - Root key: `"source_template_path"`: (string) path to the original template PPTX.
+    - Root key: `"layouts"`: (array of objects)
+        - Each object has `"name"`: (string) layout name.
+        - Each object has `"placeholders"`: (array of strings) names of placeholders in that layout.
+- **`presentation.json`**:
+    - Root key: `"slides"`: (array of objects)
+        - Each object has `"layout"`: (string) name of the layout to use.
+        - Each object has `"placeholders"`: (dictionary)
+            - Keys are placeholder names (string).
+            - Values are content (string for single text, array of strings for bullet points/paragraphs, or string description for images).
 
 ## Pytest Testing Conventions
 - **File Naming:** Test files should be named `test_*.py` or `*_test.py` and located in the `tests/` directory.
 - **Function Naming:** Test functions should be prefixed with `test_` (e.g., `def test_my_function():`).
 - **Structure (Arrange-Act-Assert):**
-    - **Arrange:** Set up the test conditions (e.g., prepare input data, mock objects, create fixture files).
+    - **Arrange:** Set up the test conditions.
     - **Act:** Execute the code being tested.
     - **Assert:** Verify that the outcome is as expected.
-- **Assertions:**
-    - Use descriptive assertion messages (e.g., `assert result == expected, f"Expected {expected}, but got {result}"`).
-    - For functions that are expected to return data (like `analyzer.py`'s `analyze_template`), assert against the returned data directly.
-    - For functions that are expected to raise exceptions, use `pytest.raises` (e.g., `with pytest.raises(ValueError):`).
-- **Fixtures:**
-    - Use Pytest fixtures (`@pytest.fixture`) for reusable setup code (e.g., creating temporary files, directories, or complex objects).
-    - Place test-specific fixture files (e.g., sample `.pptx` templates, `.md` files) in a `tests/fixtures/` subdirectory (e.g., `tests/fixtures/templates/`, `tests/fixtures/markdown/`).
-    - Use `pathlib.Path` for constructing paths to fixture files to ensure cross-platform compatibility (e.g., `FIXTURES_DIR = Path(__file__).parent / "fixtures"`).
-- **Skipping Tests:**
-    - Use `pytest.skip("Reason for skipping")` for tests that are not yet implemented or temporarily disabled. Provide a clear reason.
-- **Clarity and Isolation:**
-    - Each test should be independent and test one specific aspect or behavior.
-    - Avoid overly complex tests; break them down if necessary.
-- **Running Tests:**
-    - Ensure the virtual environment is activated and development dependencies (including `pytest` from `requirements-dev.txt`) are installed before running tests.
-    - Run all tests with `pytest` from the project root.
-    - Run specific test files with `pytest path/to/test_file.py`.
-    - Run specific tests with `pytest path/to/test_file.py::test_function_name`.
-- **Test Coverage:** Aim for high test coverage. Consider using `pytest-cov` to measure coverage.
+- **Assertions:** Use descriptive assertion messages.
+- **Fixtures:** Use Pytest fixtures (`@pytest.fixture`) for reusable setup. Place fixture files in `tests/fixtures/`.
+- **Clarity and Isolation:** Each test should be independent.
+- **Running Tests:** From project root: `pytest`.
+
+## Key Script Logic Points
+- **`processor.py` (`process_content`):**
+    - Reads `content.md` and `layouts.json`.
+    - Passes markdown and layout definitions (not the `source_template_path`) to LLM.
+    - Expects LLM to return JSON matching `presentation.json` structure (using `"placeholders"` key for content map).
+    - Handles stringified lists from LLM using `ast.literal_eval`.
+    - `fallback_parser` uses a known valid layout name (e.g., "Title, Content 1" for `default_template.pptx`).
+- **`generator.py` (`generate_presentation`):**
+    - Takes `presentation.json` path and `template_filepath` as direct arguments.
+    - Iterates `presentation.json` slides.
+    - For each slide, gets content from the `"placeholders"` dictionary.
+    - Matches placeholder names from JSON to `shape.name` on the slide.
+- **`main.py` (CLI):**
+    - `analyze <project_name> <template_specifier>`: Creates `layouts.json` (includes `source_template_path`).
+    - `process <project_name>`: Uses `content.md` and `layouts.json` (for layout definitions) to create `presentation.json`.
+    - `generate <project_name>`: Uses `presentation.json` and gets `template_filepath` from `layouts.json`'s `source_template_path` key.

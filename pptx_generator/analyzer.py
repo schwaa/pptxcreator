@@ -22,7 +22,18 @@ def analyze_template(template_filepath: str, output_filepath: str = None): # out
     """
     print(f"Analyzing template: {template_filepath}")
     
-    layout_data = {"layouts": []}
+    # Get the absolute path of the template to store it
+    try:
+        abs_template_filepath = os.path.abspath(template_filepath)
+    except Exception as e:
+        # If abspath fails for some reason (e.g. on a non-existent file before Presentation() checks)
+        print(f"Warning: Could not determine absolute path for '{template_filepath}'. Storing as provided. Error: {e}")
+        abs_template_filepath = template_filepath # Store as is
+
+    layout_data = {
+        "source_template_path": abs_template_filepath, # Store the path
+        "layouts": []
+    }
 
     try:
         # Load the presentation once to get the number of layouts
@@ -89,7 +100,7 @@ def analyze_template(template_filepath: str, output_filepath: str = None): # out
         try:
             with open(output_filepath, 'w', encoding='utf-8') as f:
                 json.dump(layout_data, f, indent=2)
-            print(f"Layouts map saved successfully to: {output_filepath}")
+            print(f"Success! Layouts map saved to: {output_filepath}")
         except Exception as e:
             save_error_message = f"Error saving layouts map to '{output_filepath}': {e}"
             print(save_error_message)

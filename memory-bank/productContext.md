@@ -1,51 +1,37 @@
 # Product Context
 
 ## Purpose
-The PPTX Generator exists to solve the challenge of automating PowerPoint presentation creation while maintaining consistency in branding and layout. It serves users who need to generate multiple presentations efficiently from structured data.
+The PPTX Generator automates PowerPoint presentation creation from markdown content, ensuring consistency in branding and layout through a template-driven approach. It serves users who need to generate multiple presentations efficiently.
 
-**Current Demo Phase:**  
-Currently, the tool uses a predefined JSON file to populate a PowerPoint template, focusing on validating the generation logic and template mapping.
-
-**Future Vision:**  
-The ultimate goal is to allow users to supply a block of text or a markdown file. The system will use an LLM via OpenRouter (model: deepseek/deepseek-chat-v3-0324:free) to analyze and segment the content, select optimal layouts, and generate the intermediate JSON data file for presentation generation.
+**Current Status:**
+The tool now successfully implements a three-stage process:
+1.  **Analyze:** A PPTX template is analyzed to produce a `layouts.json` file, which details its available layouts, placeholders, and stores the path to the source template.
+2.  **Process:** Markdown content (`content.md`) is processed along with the `layouts.json` (for layout definitions) using an LLM (OpenRouter, model: `deepseek/deepseek-chat-v3-0324:free`) to create a structured `presentation.json`. This JSON file maps content to specific placeholders within chosen layouts.
+3.  **Generate:** The `presentation.json` and the original template (path retrieved from `layouts.json`) are used to generate the final PPTX file with content populated.
 
 ## Problems Solved
-1. Manual PowerPoint Creation Overhead
-   - Eliminates repetitive manual creation of slides
-   - Reduces human error in content population
-   - Saves time for users who generate presentations frequently
-
-2. Consistency Management
-   - Ensures brand consistency across presentations
-   - Maintains layout standards through template usage
-   - Standardizes presentation structure
-
-3. Data Integration
-   - Bridges the gap between structured data and visual presentations
-   - Automates chart creation from data sources
-   - Enables bulk presentation generation
-   - **Future:** Automates the conversion of unstructured text/markdown into structured presentation content
+1.  **Manual PowerPoint Creation Overhead:**
+    *   Automates slide creation and content population from markdown.
+    *   Reduces human error.
+    *   Saves time for frequent presentation generation.
+2.  **Consistency Management:**
+    *   Ensures brand and layout consistency via templates.
+    *   Standardizes presentation structure.
+3.  **Content Structuring and Integration:**
+    *   Converts unstructured markdown into a structured presentation plan (`presentation.json`).
+    *   Bridges markdown content with visual presentation layouts.
 
 ## User Experience Goals
-1. Simplicity
-   - Easy-to-use command line interface
-   - Clear feedback during execution
-   - Straightforward template and data requirements
-   - **Future:** Accepts markdown/text input for even simpler workflows
-
-2. Reliability
-   - Consistent output generation
-   - Robust error handling
-   - Predictable behavior
-
-3. Flexibility
-   - Support for various template designs
-   - Multiple content types (text, images, charts)
-   - Adaptable to different use cases
-   - **Future:** Intelligent layout selection based on content
-
-4. Efficiency
-   - Quick execution
-   - Minimal manual intervention
-   - Batch processing capabilities
-   - **Future:** End-to-end automation from text/markdown to presentation
+1.  **Simplicity:**
+    *   Clear three-step CLI workflow (`analyze`, `process`, `generate`).
+    *   User provides markdown and a template; the system handles the rest.
+    *   Informative feedback during execution.
+2.  **Reliability:**
+    *   Consistent output based on inputs.
+    *   Improved error handling and data validation.
+3.  **Flexibility:**
+    *   Supports various template designs (as long as they have identifiable layouts and placeholders).
+    *   Handles text content, including bulleted lists. (Image handling is basic, next focus area).
+4.  **Efficiency:**
+    *   Automates the core generation process.
+    *   Reduces manual intervention significantly.

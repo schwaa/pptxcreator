@@ -1,30 +1,28 @@
 import os
 import json
 import re
+import logging
+import ast # <-- Add this import
 from openai import OpenAI
 from dotenv import load_dotenv
+from .utils import clean_text_for_presentation
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 
 PROMPT_TEMPLATE = """
-You are an expert presentation designer's assistant. Your task is to convert raw Markdown content into a structured JSON object for a PowerPoint generator.
+You are an expert presentation designer's assistant. Your primary goal is to convert raw Markdown content into a structured JSON object.
 
-You will be given the user's Markdown content and a JSON object describing the available slide layouts in the PowerPoint template.
-
-Your goal is to:
-1.  Read the Markdown and split it into logical slides.
-2.  For each slide, choose the most appropriate layout from the available layouts.
-3.  **IMPORTANT: If a section of text is a dense paragraph, reformat it into 3-5 concise, easy-to-read bullet points. Each bullet point should start with a standard dash (-) or asterisk (*).**
-4.  Create a JSON object for each slide that specifies the chosen layout and maps the slide's content to the correct placeholder names for that layout.
-
-**RULES FOR YOUR RESPONSE:**
-- Your entire output MUST be a single, valid JSON object and nothing else. Do not include any introductory text, explanations, or code formatting like ```json.
-- The root of the JSON object must be a key named "slides", which is an array of slide objects.
-- Each slide object in the array must have two keys: "layout" and "content".
-- The "layout" value must be a string that EXACTLY matches one of the layout names from the provided available layouts.
-- The "content" value must be a dictionary. The keys of this dictionary MUST EXACTLY match the placeholder names (e.g., "Title 1", "Content Placeholder 2", "Picture Placeholder 7") available for the chosen layout.
-- If the Markdown references an image (e.g., ![alt text](path/to/image.png)), the value for the corresponding picture placeholder should be the image path string: "path/to/image.png".
+**CONTENT FORMATTING RULES:**
+1.  **For Bullet Points:** If the content for a placeholder is a list of items, format its value as a JSON ARRAY of strings.
+    - Example: `"Content Placeholder 2": ["First bullet point.", "Second bullet point."]`
+2.  **For Paragraphs:** If the content is a paragraph, reformat it into a JSON ARRAY of strings, where each string is a concise sentence.
+3.  **For Simple Text:** If the content is a title or a short phrase, format its value as a single JSON string.
+    - Example: `"Title 1": "This is a Title"`
+4.  **Cleanup:** Ensure all text in the final JSON is clean plain text. REMOVE all markdown formatting like '-', '*', '#', or '**'.
 
 ---
-**AVAILABLE LAYOUTS:**
+**AVAILABLE LAYOUTS JSON:**
 {layouts_json}
 
 ---
@@ -32,7 +30,8 @@ Your goal is to:
 {markdown_content}
 ---
 
-Now, generate the JSON object based on the rules and content above.
+**YOUR TASK:**
+Generate a single, valid JSON object that strictly follows all rules above. The 'content' values must be either a single JSON string or a JSON array of strings.
 """
 
 # Fallback parser for when LLM fails or is unavailable
@@ -51,11 +50,15 @@ def fallback_parser(markdown_content):
         # If body is empty, make up some content
         if not body:
             body = "This is sample body text generated to ensure the slide is not empty. Add your own content here."
+        
+        cleaned_title = clean_text_for_presentation(title)
+        cleaned_body = clean_text_for_presentation(body)
+
         slides.append({
-            "layout": "Title and Content",
+            "layout": "Title, Content 1", # Updated to a valid layout name from default_template.pptx
             "content": {
-                "Title 1": title,
-                "Content Placeholder 2": body
+                "Title 1": cleaned_title,
+                "Content Placeholder 2": cleaned_body
             }
         })
     return {"slides": slides}
@@ -64,17 +67,15 @@ def extract_json_from_response(response_content):
     """
     Extracts the first JSON object from a string, even if wrapped in Markdown code fences or with extra text.
     """
-    # Try to find a JSON code block
     code_block = re.search(r"```(?:json)?\s*({.*?})\s*```", response_content, re.DOTALL)
     if code_block:
         json_str = code_block.group(1)
     else:
-        # Fallback: find the first {...} block
         json_match = re.search(r"({.*})", response_content, re.DOTALL)
         if json_match:
             json_str = json_match.group(1)
         else:
-            json_str = response_content  # Last resort, try the whole thing
+            json_str = response_content
     return json_str
 
 def call_llm(system_prompt, user_prompt, model_name=None):
@@ -82,10 +83,8 @@ def call_llm(system_prompt, user_prompt, model_name=None):
     Calls the LLM (OpenRouter) to process the content.
     """
     openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
-
     if not openrouter_api_key:
-        print("Error: OPENROUTER_API_KEY not found in environment variables.")
-        print("Please ensure it's set in your .env file or environment.")
+        logging.error("OPENROUTER_API_KEY not found in environment variables.")
         return None
 
     client = OpenAI(
@@ -93,8 +92,8 @@ def call_llm(system_prompt, user_prompt, model_name=None):
         api_key=openrouter_api_key,
     )
     
-    chosen_model = model_name or "deepseek/deepseek-chat-v3-0324:free" # Updated default model
-    print(f"Using OpenRouter API with model: {chosen_model}")
+    chosen_model = model_name or "deepseek/deepseek-chat-v3-0324:free" 
+    logging.info(f"Using OpenRouter API with model: {chosen_model}")
 
     try:
         completion = client.chat.completions.create(
@@ -105,30 +104,30 @@ def call_llm(system_prompt, user_prompt, model_name=None):
             ]
         )
         response_content = completion.choices[0].message.content
-        # Try to extract JSON robustly
         json_str = extract_json_from_response(response_content)
         return json.loads(json_str)
     except json.JSONDecodeError as e:
-        print(f"LLM output was not valid JSON: {e}")
-        print(f"LLM Raw Response: {response_content}")
+        logging.error(f"LLM output was not valid JSON: {e}")
+        logging.error(f"LLM Raw Response: {response_content}")
         return None
     except Exception as e:
-        print(f"Error calling OpenRouter LLM: {e}")
+        logging.error(f"Error calling OpenRouter LLM: {e}")
         return None
 
 def process_content(markdown_filepath, layouts_filepath, output_filepath, api_key_unused=None, model_name=None):
     """
-    Processes markdown content and a layouts map to produce a structured
-    presentation plan using an LLM (OpenRouter).
+    Processes markdown content to produce a structured presentation plan,
+    and now reliably handles and cleans malformed list-as-string responses from the LLM.
     """
-    load_dotenv()  # Load .env file
+    load_dotenv()
+    presentation_structure = None
 
     # Read markdown content
     try:
         with open(markdown_filepath, 'r', encoding='utf-8') as f:
             markdown_content = f.read()
     except Exception as e:
-        print(f"Error reading markdown file: {e}")
+        logging.error(f"Error reading markdown file '{markdown_filepath}': {e}")
         return
 
     # Read layouts.json
@@ -136,8 +135,11 @@ def process_content(markdown_filepath, layouts_filepath, output_filepath, api_ke
         with open(layouts_filepath, 'r', encoding='utf-8') as f:
             layouts_content = f.read()
     except Exception as e:
-        print(f"Error reading layouts file: {e}")
-        return
+        logging.error(f"Error reading layouts file '{layouts_filepath}': {e}")
+        # Fallback: if layouts.json is missing or unreadable, provide an empty JSON object string
+        # This allows the LLM to proceed, though it won't have specific layout info.
+        logging.warning(f"Layouts file '{layouts_filepath}' not found or unreadable. Proceeding without specific layout info.")
+        layouts_content = "{}"
 
     # Build prompts
     system_prompt = (
@@ -151,26 +153,64 @@ def process_content(markdown_filepath, layouts_filepath, output_filepath, api_ke
     llm_response = call_llm(system_prompt, user_prompt, model_name=model_name)
 
     if llm_response:
-        # Ensure the output structure is {"slides": [...]}
-        if "slides" not in llm_response:
-            print("LLM response is missing the 'slides' key. Using fallback.")
+        if "slides" not in llm_response or not isinstance(llm_response["slides"], list):
+            logging.warning("LLM response is missing 'slides' key or is not a list. Using fallback.")
             presentation_structure = fallback_parser(markdown_content)
         else:
-            # Enhance: If any slide is missing body text, make up something
-            for slide in llm_response.get("slides", []):
+            # --- START OF DEFINITIVE FIX (incorporating ast.literal_eval) ---
+            logging.info("Sanitizing and cleaning LLM response...")
+            for slide in llm_response["slides"]:
+                if "content" in slide and isinstance(slide["content"], dict):
+                    for key, value in list(slide["content"].items()): # Iterate over a copy
+                        
+                        # STEP 1: Fix stringified lists from the LLM.
+                        if isinstance(value, str) and value.strip().startswith('[') and value.strip().endswith(']'):
+                            try:
+                                # Use ast.literal_eval for safety. It only parses simple Python literals.
+                                parsed_value = ast.literal_eval(value)
+                                if isinstance(parsed_value, list):
+                                    value = parsed_value # The string is now a proper list
+                            except (ValueError, SyntaxError) as e_ast:
+                                # If it's not a valid list literal, leave it as a string for the next step.
+                                logging.warning(f"Found string '{value}' that looks like a list, but could not parse with ast.literal_eval: {e_ast}. Will attempt to clean as string.")
+                        
+                        # STEP 2: Clean the final values (which are now correctly typed or original string).
+                        if isinstance(value, str):
+                            slide["content"][key] = clean_text_for_presentation(value)
+                        elif isinstance(value, list):
+                            # Clean each string item within the list, keep non-strings as is
+                            slide["content"][key] = [clean_text_for_presentation(item) if isinstance(item, str) else item for item in value]
+            
+            # --- Post-cleanup: Handle empty placeholders ---
+            for slide in llm_response["slides"]:
                 placeholders = slide.get("content", {})
-                # Check for common content placeholders
-                for key in ["Content Placeholder 2", "Content Placeholder 6", "Content Placeholder 7"]:
-                    if key in placeholders and (not placeholders[key] or not placeholders[key].strip()):
-                        placeholders[key] = "This is sample body text generated to ensure the slide is not empty. Add your own content here."
+                for placeholder_key in ["Content Placeholder 2", "Content Placeholder 6", "Content Placeholder 7"]:
+                    if placeholder_key in placeholders:
+                        content_value = placeholders[placeholder_key]
+                        is_empty = False
+                        if isinstance(content_value, str):
+                            if not content_value or not content_value.strip():
+                                is_empty = True
+                        elif isinstance(content_value, list):
+                            if not content_value: 
+                                is_empty = True
+                            else: 
+                                is_empty = all(not item or (isinstance(item, str) and not item.strip()) for item in content_value)
+                        
+                        if is_empty:
+                            placeholders[placeholder_key] = "This is sample body text generated to ensure the slide is not empty. Add your own content here."
             presentation_structure = llm_response
+            # --- END OF DEFINITIVE FIX ---
     else:
-        print("LLM processing failed. Falling back to simple parser.")
+        logging.warning("LLM processing failed or no response. Using fallback parser.")
         presentation_structure = fallback_parser(markdown_content)
     
-    try:
-        with open(output_filepath, 'w', encoding='utf-8') as f:
-            json.dump(presentation_structure, f, indent=2)
-        print(f"Success! Presentation plan saved to {output_filepath}")
-    except Exception as e:
-        print(f"Error saving presentation plan: {e}")
+    if presentation_structure:
+        try:
+            with open(output_filepath, 'w', encoding='utf-8') as f:
+                json.dump(presentation_structure, f, indent=2, ensure_ascii=False)
+            logging.info(f"Clean presentation plan saved successfully to {output_filepath}")
+        except Exception as e:
+            logging.error(f"Error saving presentation plan to '{output_filepath}': {e}")
+    else:
+        logging.error(f"Failed to generate or fallback to a presentation structure. Output file '{output_filepath}' not created.")

@@ -1,161 +1,89 @@
 # Project Progress
 
 ## Current Focus
-Moving to three-component architecture with AI-powered content processing.
+Core functionality for the three-component architecture (`analyze`, `process`, `generate`) is complete, with the system now generating PPTX files with content. Focus is shifting to refining image handling, enhancing robustness, and expanding test coverage.
 
 ## Completed Items
-1. **Project Setup**
-   - ✅ Initial repository structure
-   - ✅ Basic documentation framework
-   - ✅ Memory bank initialization
-   - ✅ Core dependencies identified
-
-2. **Architecture**
-   - ✅ Three-component design finalized
-   - ✅ Data contract specifications
-   - ✅ Error handling strategy
-   - ✅ Component interfaces defined
+1.  **Project Setup**
+    *   ✅ Initial repository structure
+    *   ✅ Basic documentation framework
+    *   ✅ Memory bank initialization
+    *   ✅ Core dependencies identified
+2.  **Architecture & Core Implementation**
+    *   ✅ Three-component design finalized (`analyzer.py`, `processor.py`, `generator.py`, `main.py`).
+    *   ✅ Data contract specifications for `layouts.json` and `presentation.json`.
+    *   ✅ `analyzer.py`: Successfully analyzes templates and generates `layouts.json` (including `source_template_path`).
+    *   ✅ `processor.py`:
+        *   Successfully processes markdown and `layouts.json` (layout definitions) using LLM.
+        *   Generates `presentation.json` with correct `"placeholders"` key for content.
+        *   Handles stringified lists from LLM using `ast.literal_eval`.
+        *   Includes a basic fallback parser.
+    *   ✅ `generator.py`:
+        *   Successfully loads template (path from `layouts.json` via `main.py`) and `presentation.json`.
+        *   Correctly populates slides with text content by matching placeholder names.
+        *   Handles single string and list-of-strings content.
+        *   Basic image placeholder handling (uses string as alt-text if image file not found).
+    *   ✅ `main.py`:
+        *   CLI commands (`analyze`, `process`, `generate`) implemented and functional.
+        *   Correctly orchestrates data flow between components.
+3.  **Key Bug Fixes:**
+    *   ✅ Resolved "blank slides" issue by correcting key access in `generator.py` (from `"content"` to `"placeholders"`).
+    *   ✅ Resolved issues with LLM output parsing in `processor.py`.
+    *   ✅ Ensured correct template path sourcing in `main.py` for the `generate` command.
 
 ## In Progress
-1. **Template Analysis (analyzer.py)**
-   - 🔄 Layout detection framework
-   - 🔄 Placeholder mapping system
-   - 🔄 layouts.json generation
-   - 🔄 Schema validation
+1.  **Memory Bank Update:**
+    *   🔄 Updating all memory bank files to reflect current project state and learnings.
+2.  **Image Handling Refinement:**
+    *   🔄 Planning improvements for robust image path specification and embedding.
+3.  **Testing Framework & Coverage:**
+    *   🔄 Test structure setup.
+    *   🔄 Planning for comprehensive unit and integration tests.
 
-2. **Testing Framework**
-   - 🔄 Test structure setup
-   - 🔄 Mock data creation
-   - 🔄 Integration test planning
-   - 🔄 Test documentation
+## Pending Tasks (Major Next Steps)
 
-## Pending Tasks
-
-### Phase 1: Template Analysis
-1. **analyzer.py Implementation**
-   - ⏳ PPTX parsing functionality
-   - ⏳ Layout identification
-   - ⏳ Placeholder detection
-   - ⏳ Schema validation
-   - ⏳ Error handling
-   - ⏳ CLI integration
-
-2. **layouts.json Generation**
-   - ⏳ Schema implementation
-   - ⏳ Validation rules
-   - ⏳ Output formatting
-   - ⏳ Documentation
-
-### Phase 2: Content Processing
-1. **processor.py Development**
-   - ⏳ Markdown parsing
-   - ⏳ LLM integration (OpenRouter, model: deepseek/deepseek-chat-v3-0324:free)
-   - ⏳ Layout selection logic
-   - ⏳ Fallback mechanism
-   - ⏳ Content validation
-   - ⏳ Error handling
-
-2. **LLM Integration**
-   - ⏳ API configuration (OpenRouter, model: deepseek/deepseek-chat-v3-0324:free)
-   - ⏳ Prompt engineering
-   - ⏳ Response parsing
-   - ⏳ Error recovery
-   - ⏳ Documentation
-
-### Phase 3: Presentation Generation
-1. **generator.py Refactoring**
-   - ⏳ Template loading
-   - ⏳ Content mapping
-   - ⏳ Slide creation
-   - ⏳ Error handling
-   - ⏳ Progress tracking
-
-2. **Output Generation**
-   - ⏳ Slide population
-   - ⏳ Style preservation
-   - ⏳ Resource management
-   - ⏳ Validation checks
+### Phase 1: Stabilization & Enhancement
+1.  **Image Handling Implementation**
+    *   ⏳ Define how image paths are specified in `content.md`.
+    *   ⏳ Update `processor.py` (LLM prompt) to extract image filenames/paths.
+    *   ⏳ Enhance `generator.py` for robust image finding (relative to project, `images/` folder, absolute) and embedding.
+2.  **Testing Suite Expansion**
+    *   ⏳ Write comprehensive unit tests for `analyzer.py`, `processor.py`, `generator.py`.
+    *   ⏳ Develop integration tests for the full `analyze` -> `process` -> `generate` workflow.
+    *   ⏳ Test with various templates and content types.
+3.  **Error Handling & Robustness**
+    *   ⏳ Review and improve error messages across all components.
+    *   ⏳ Strengthen validation for `layouts.json` and `presentation.json`.
+    *   ⏳ Improve fallback mechanisms.
 
 ### Documentation
-1. **User Guide**
-   - ⏳ Installation instructions
-   - ⏳ Usage examples
-   - ⏳ Template requirements
-   - ⏳ Content guidelines
-
-2. **API Documentation**
-   - ⏳ Component interfaces
-   - ⏳ Data schemas
-   - ⏳ Error codes
-   - ⏳ Configuration options
-
-3. **Developer Guide**
-   - ⏳ Architecture overview
-   - ⏳ Component details
-   - ⏳ Testing guide
-   - ⏳ Contribution guidelines
+1.  **User Guide Updates**
+    *   ⏳ Update installation, usage examples, template requirements, and content guidelines (especially for images).
+2.  **API Documentation**
+    *   ⏳ Ensure component interfaces, data schemas, and error codes are well-documented.
 
 ## Known Issues
-1. **Technical Debt**
-   - Previous generator.py needs refactoring
-   - Test coverage incomplete
-   - Documentation outdated
-
-2. **Limitations**
-   - Limited template validation
-   - Basic error handling
-   - No progress tracking
-
-3. **Dependencies**
-   - OpenRouter API key required (for model deepseek/deepseek-chat-v3-0324:free)
-   - Python version requirements
-   - Memory constraints
+1.  **Image Handling:** Current implementation is basic (treats image placeholder content as text if image file not found by its descriptive name). This is the next major area for improvement.
+2.  **Test Coverage:** While core functionality works, comprehensive automated tests are still needed.
+3.  **Advanced Placeholder Types:** Support for charts, tables, etc., is not yet implemented.
 
 ## Next Milestones
 
-### v0.1.0 - Template Analysis
-- Complete analyzer.py
-- Generate valid layouts.json
-- Basic CLI implementation
-- Initial test suite
-- Target: Week 1-2
+### v0.2.0 - Core Functionality Complete (Achieved)
+- ✅ `analyze`, `process`, `generate` commands functional.
+- ✅ Text content successfully populated in presentations.
+- ✅ Basic LLM integration for content structuring.
 
-### v0.2.0 - Content Processing
-- Implement processor.py
-- LLM integration (OpenRouter, model: deepseek/deepseek-chat-v3-0324:free)
-- Fallback mechanisms
-- Enhanced testing
-- Target: Week 3-4
+### v0.3.0 - Robust Image Handling & Testing
+- Implement robust image path specification and embedding.
+- Significantly increase unit and integration test coverage.
+- Refine error handling.
+- Target: Next 1-2 weeks.
 
-### v0.3.0 - Generation
-- Refactor generator.py
-- Implement new interfaces
-- Complete validation
-- Documentation update
-- Target: Week 5-6
-
-### v1.0.0 - Production Release
-- Full test coverage
-- Complete documentation
-- Performance optimization
-- Example templates
-- Target: Week 7-8
+### v0.4.0 - Advanced Features & Documentation
+- Explore support for other placeholder types (e.g., charts from data).
+- Complete user and developer documentation.
+- Target: Following 2 weeks.
 
 ## Future Enhancements
-1. **Advanced Features**
-   - Custom layout detection
-   - Enhanced content analysis
-   - Template suggestions
-   - Batch processing
-
-2. **Performance**
-   - Caching system
-   - Parallel processing
-   - Memory optimization
-   - Progress tracking
-
-3. **User Experience**
-   - Interactive CLI
-   - Template preview
-   - Error recovery
-   - Progress visualization
+(As previously listed, e.g., custom layout detection, template suggestions, batch processing, performance optimizations, interactive CLI.)

@@ -1,84 +1,90 @@
 # System Patterns
 
-## Architecture Overview
+## Architecture Overview & Data Flow
+The system follows a three-stage CLI-driven process: `analyze`, `process`, and `generate`.
+
 ```mermaid
 flowchart TD
-    Input[User Input: Markdown File] --> Analyzer[Template Analyzer]
-    Template[Template PPTX] --> Analyzer
-    Analyzer -->|layouts.json| Processor[Content Processor]
-    Input --> Processor
-    Processor -->|presentation.json| Generator[Presentation Generator]
-    Template --> Generator
-    Generator --> Output[Generated PPTX]
+    UserInputMd[User Input: content.md] --> B(main.py process)
+    UserInputTmpl[User Input: template.pptx] --> A(main.py analyze)
+    
+    A -- template_filepath --> Analyzer(analyzer.py)
+    Analyzer -- layouts.json (incl. source_template_path) --> ProjectFiles1[/projects/project_name/output/layouts.json/]
+    
+    ProjectFiles1 --> B
+    UserInputMd --> B
+    B -- markdown_content, layout_definitions --> Processor(processor.py w/ LLM)
+    Processor -- presentation.json --> ProjectFiles2[/projects/project_name/output/presentation.json/]
+    
+    ProjectFiles2 --> C(main.py generate)
+    ProjectFiles1 -- source_template_path --> C
+    C -- presentation_plan, template_filepath --> Generator(generator.py)
+    Generator -- final.pptx --> Output[/projects/project_name/output/project_name.pptx/]
 
-    subgraph Component 1: analyzer.py
-        Analyzer
-        AnalyzerValidation[Layout Validation]
-        LayoutMapping[Layout Mapping]
+    subgraph "Stage 1: Analyze Template"
+        direction LR
+        UserInputTmpl --> A
+        A --> Analyzer
+        Analyzer --> ProjectFiles1
     end
 
-    subgraph Component 2: processor.py
-        Processor
-        LLMAnalysis[LLM Content Analysis via OpenRouter (deepseek/deepseek-chat-v3-0324:free)]
-        Fallback[Rule-based Fallback]
-        ContentValidation[Content Validation]
+    subgraph "Stage 2: Process Content"
+        direction LR
+        UserInputMd --> B
+        ProjectFiles1 --> B
+        B --> Processor
+        Processor --> ProjectFiles2
     end
 
-    subgraph Component 3: generator.py
-        Generator
-        SlideCreation[Slide Creation]
-        ContentPopulation[Content Population]
-        OutputValidation[Output Validation]
+    subgraph "Stage 3: Generate Presentation"
+        direction LR
+        ProjectFiles2 --> C
+        ProjectFiles1 --> C
+        C --> Generator
+        Generator --> Output
     end
 ```
 
 ## Component Specifications
 
 ### 1. Template Analyzer (`analyzer.py`)
-- **Purpose:** Extract and validate template layout information
-- **Functions:**
-  - Load and parse PPTX templates
-  - Identify available layouts
-  - Map placeholder locations
-  - Generate layouts.json
-- **Error Handling:**
-  - Template format validation
-  - Layout accessibility checks
-  - Placeholder verification
-  - Schema validation
+- **Purpose:** Extract template layout information and store the source template path.
+- **Input:** Path to a PPTX template file.
+- **Output:** `layouts.json` file containing:
+    - `source_template_path`: Path to the input PPTX template.
+    - `layouts`: A list of available layouts, each with a `name` and a list of `placeholders` (names).
+- **Key Logic:** Uses `python-pptx` to inspect slide masters and layouts.
 
 ### 2. Content Processor (`processor.py`)
-- **Purpose:** Analyze content and map to layouts
-- **Functions:**
-  - Parse markdown input
-  - Interface with LLM service (OpenRouter, model: deepseek/deepseek-chat-v3-0324:free)
-  - Select appropriate layouts
-  - Generate presentation.json
-- **Error Handling:**
-  - LLM service fallback (OpenRouter)
-  - Content validation
-  - Layout compatibility checks
-  - Schema enforcement
+- **Purpose:** Convert markdown content into a structured presentation plan using LLM, guided by available layouts.
+- **Input:**
+    - Path to `content.md`.
+    - Path to `layouts.json` (to provide layout definitions to the LLM).
+- **Output:** `presentation.json` file containing:
+    - `slides`: A list of slide definitions, each with a `layout` (name) and a `placeholders` dictionary mapping placeholder names to content (string or list of strings).
+- **Key Logic:**
+    - Sends markdown and layout information to an LLM (OpenRouter, model: `deepseek/deepseek-chat-v3-0324:free` via `openai` library).
+    - Parses LLM response (JSON), using `ast.literal_eval` for stringified lists.
+    - Includes a fallback parser for basic content structuring if LLM fails.
 
 ### 3. Presentation Generator (`generator.py`)
-- **Purpose:** Create final presentation
-- **Functions:**
-  - Load template and content
-  - Create and populate slides
-  - Apply styling and formatting
-  - Save final PPTX
-- **Error Handling:**
-  - Input validation
-  - Template consistency
-  - Resource verification
-  - Output validation
+- **Purpose:** Create the final PPTX presentation by populating a template with content from the presentation plan.
+- **Input:**
+    - Path to `presentation.json`.
+    - Path to the source PPTX template file.
+- **Output:** Final `.pptx` file.
+- **Key Logic:**
+    - Uses `python-pptx` to add slides based on layout names from `presentation.json`.
+    - Populates placeholders on each slide by matching names from the `placeholders` dictionary in `presentation.json` to `shape.name`.
+    - Handles text and list-of-text content. Basic image handling (uses string as alt-text if image file not found).
 
 ## Data Contracts
 
-### 1. layouts.json
-**Purpose:** Define available template layouts and capabilities
+### 1. `layouts.json`
+**Purpose:** Define available template layouts, placeholders, and the source template path.
 ```json
 {
+  "source_template_path": "templates/default_template.pptx",
   "layouts": [
     {
       "name": "Title Slide",
@@ -93,104 +99,48 @@ flowchart TD
         "Title 1",
         "Content Placeholder 2"
       ]
-    },
-    {
-      "name": "Section Header",
-      "placeholders": [
-        "Title 1"
-      ]
     }
+    // ... more layouts
   ]
 }
 ```
 
-### 2. presentation.json
-**Purpose:** Define presentation content and structure
+### 2. `presentation.json`
+**Purpose:** Define presentation content and structure, mapping content to specific placeholders in chosen layouts.
 ```json
 {
   "slides": [
     {
       "layout": "Title Slide",
-      "content": {
+      "placeholders": {
         "Title 1": "The Future of AI",
         "Subtitle 2": "A Presentation by Jane Doe"
       }
     },
     {
       "layout": "Title and Content",
-      "content": {
+      "placeholders": {
         "Title 1": "Key Developments",
-        "Content Placeholder 2": "- Rise of Transformers\n- Open Source Models\n- Multimodal Capabilities"
+        "Content Placeholder 2": [
+            "Rise of Transformers",
+            "Open Source Models",
+            "Multimodal Capabilities"
+        ]
       }
     }
+    // ... more slides
   ]
 }
 ```
+*Note: The key for the content map per slide is `placeholders`.*
 
 ## Design Patterns
-
-### 1. Strategy Pattern
-- Applied in Content Processor for analysis methods:
-  - LLM-based analysis (primary, via OpenRouter: deepseek/deepseek-chat-v3-0324:free)
-  - Rule-based analysis (fallback)
-  - Custom analysis plugins (future)
-
-### 2. Factory Pattern
-- Used for slide creation in Generator:
-  - Different slide types
-  - Layout-specific handling
-  - Content type factories
-
-### 3. Facade Pattern
-- Simplifies complex operations behind CLI
-- Hides component interaction details
-- Provides unified error handling
-
-### 4. Template Method Pattern
-- Defines core generation workflow
-- Allows customization of specific steps
-- Maintains consistent process
+- **CLI Facade (`main.py`):** Simplifies user interaction with the three-stage process.
+- **Strategy Pattern (in `processor.py`):** LLM-based processing as primary, with a rule-based fallback.
+- **Data-Driven Configuration:** `layouts.json` and `presentation.json` drive the generation process.
 
 ## Error Handling Strategy
-
-### 1. Validation Layers
-- **Template Analysis:**
-  - PPTX format verification
-  - Layout accessibility
-  - Placeholder presence
-  
-- **Content Processing:**
-  - Markdown parsing
-  - LLM response validation (from OpenRouter)
-  - Layout compatibility
-  
-- **Generation:**
-  - Resource availability
-  - Content mapping
-  - Output verification
-
-### 2. Fallback Mechanisms
-- LLM service (OpenRouter) unavailable → Rule-based processing
-- Complex layout unavailable → Default layout
-- Image missing → Placeholder or skip
-- Chart data invalid → Text representation
-
-## Performance Considerations
-
-### 1. Resource Management
-- Efficient template parsing
-- Optimized file operations
-- Memory-conscious processing
-- Cleanup of temporary files
-
-### 2. Progress Tracking
-- Component-level progress
-- Operation status updates
-- Time remaining estimates
-- Resource usage monitoring
-
-### 3. Optimization Strategies
-- Template caching
-- Layout preprocessing
-- Batch operations
-- Parallel processing where possible
+- Input validation at each stage (file existence, basic format checks).
+- `try-except` blocks for file I/O and LLM communication.
+- Fallback parser in `processor.py` if LLM fails or returns malformed data.
+- Logging for warnings and errors.

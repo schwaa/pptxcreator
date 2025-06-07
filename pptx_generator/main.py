@@ -1,104 +1,121 @@
 import argparse
 import os
+import json
 from pptx_generator.generator import generate_presentation
 from pptx_generator.analyzer import analyze_template
 from pptx_generator.processor import process_content
+
+BASE_PROJECTS_DIR = "projects"
+BASE_TEMPLATES_DIR = "templates"
 
 def main():
     parser = argparse.ArgumentParser(
         description="PowerPoint Generator CLI - Convert Markdown to PPTX.",
     )
-
-    # A new top-level argument to define the project context
-    parser.add_argument(
-        '--project', 
-        help="Path to a project directory (e.g., 'projects/my_talk'). Simplifies other path arguments."
-    )
-
     subparsers = parser.add_subparsers(dest='command', help='Available commands', required=True)
 
     # --- 'analyze' command ---
-    analyze_parser = subparsers.add_parser('analyze', help='Analyze a template file.')
-    analyze_parser.add_argument("-t", "--template", required=True, help="Path to the template PPTX file.")
-    analyze_parser.add_argument("-o", "--output", help="Output path for layouts.json. Defaults to [PROJECT]/output/layouts.json")
+    analyze_parser = subparsers.add_parser('analyze', 
+                                           help='Analyze a template and store its layout for a project. Creates projects/<project_name>/output/layouts.json.')
+    analyze_parser.add_argument("project_name", 
+                                help="Name of the project (e.g., 'robotics'). Will be created under 'projects/' if it doesn't exist.")
+    analyze_parser.add_argument("template_specifier", 
+                                help="Name of the template (e.g., 'default_template.pptx' to be found in 'templates/' dir) or full path to a .pptx template file.")
 
     # --- 'process' command ---
-    process_parser = subparsers.add_parser('process', help='Process markdown into a presentation plan.')
-    process_parser.add_argument("-m", "--markdown", help="Path to markdown file. Defaults to [PROJECT]/content.md")
-    process_parser.add_argument("-l", "--layouts", help="Path to layouts.json. Defaults to [PROJECT]/output/layouts.json")
-    process_parser.add_argument("-o", "--output", help="Output path for presentation.json. Defaults to [PROJECT]/output/presentation.json")
-    process_parser.add_argument("--api-key", help="(Deprecated) OpenAI API key. Not required for OpenRouter.")
+    process_parser = subparsers.add_parser('process', 
+                                           help="Process markdown (projects/<project_name>/content.md) into a presentation plan (projects/<project_name>/output/presentation.json).")
+    process_parser.add_argument("project_name", 
+                                help="Name of the project (e.g., 'robotics').")
 
     # --- 'generate' command ---
-    generate_parser = subparsers.add_parser('generate', help='Generate the final PPTX file.')
-    generate_parser.add_argument("-p", "--presentation", help="Path to presentation.json. Defaults to [PROJECT]/output/presentation.json")
-    generate_parser.add_argument("-t", "--template", required=True, help="Path to the template PPTX file.")
-    generate_parser.add_argument("-o", "--output", help="Path for the final output PPTX file.")
+    generate_parser = subparsers.add_parser('generate', 
+                                            help="Generate the final PPTX file (projects/<project_name>/output/<project_name>.pptx) using the project's presentation plan and the stored template path from layouts.json.")
+    generate_parser.add_argument("project_name", 
+                                 help="Name of the project (e.g., 'robotics').")
 
     args = parser.parse_args()
 
-    # --- Path Management ---
-    # Use the --project argument to set smart defaults
-    project_dir = args.project
-    output_dir = os.path.join(project_dir, 'output') if project_dir else None
+    project_name = args.project_name
+    project_dir = os.path.join(BASE_PROJECTS_DIR, project_name)
+    output_dir = os.path.join(project_dir, 'output')
+    
+    # Ensure base project and output directories exist for all commands that use them
+    if hasattr(args, 'project_name'): # All new commands have project_name
+        os.makedirs(project_dir, exist_ok=True)
+        os.makedirs(output_dir, exist_ok=True)
 
-    def get_path(arg_path, default_dir, default_filename):
-        if arg_path:
-            return arg_path
-        if default_dir:
-            os.makedirs(default_dir, exist_ok=True)
-            return os.path.join(default_dir, default_filename)
-        # If no project is set and the argument is not provided, this will fail.
-        # We add checks for this below.
-        return None 
 
     # --- Command Handling ---
     if args.command == 'analyze':
-        # Analyze doesn't depend on a project, so its output must be explicit if no project is set.
-        output_path = get_path(args.output, output_dir, 'layouts.json')
-        if not output_path:
-            print("Error: --output path is required when not using the --project flag.")
-            return
+        template_spec = args.template_specifier
+        template_filepath = ""
+
+        # Determine if template_specifier is a path or a name
+        if os.path.isfile(template_spec):
+            template_filepath = template_spec
+        else:
+            # Assume it's a name, look in BASE_TEMPLATES_DIR
+            potential_path = os.path.join(BASE_TEMPLATES_DIR, template_spec)
+            if os.path.isfile(potential_path):
+                template_filepath = potential_path
+            else:
+                print(f"Error: Template '{template_spec}' not found as a direct path or in '{BASE_TEMPLATES_DIR}/'.")
+                return
         
-        print(f"Analyzing '{args.template}' -> '{output_path}'")
-        analyze_template(args.template, output_path)
+        if not os.path.exists(template_filepath):
+             print(f"Error: Template file not found at '{template_filepath}'.")
+             return
+
+        layouts_output_path = os.path.join(output_dir, 'layouts.json')
+        
+        print(f"Analyzing '{template_filepath}' for project '{project_name}' -> '{layouts_output_path}'")
+        analyze_template(template_filepath, layouts_output_path)
 
     elif args.command == 'process':
-        markdown_path = get_path(args.markdown, project_dir, 'content.md')
-        layouts_path = get_path(args.layouts, output_dir, 'layouts.json')
-        output_path = get_path(args.output, output_dir, 'presentation.json')
+        markdown_path = os.path.join(project_dir, 'content.md')
+        layouts_path = os.path.join(output_dir, 'layouts.json')
+        presentation_output_path = os.path.join(output_dir, 'presentation.json')
 
-        if not all([markdown_path, layouts_path, output_path]):
-            print("Error: --markdown, --layouts, and --output are required when not using the --project flag.")
+        if not os.path.exists(markdown_path):
+            print(f"Error: Markdown file not found at '{markdown_path}'. Please create it for project '{project_name}'.")
+            return
+        if not os.path.exists(layouts_path):
+            print(f"Error: Layouts file not found at '{layouts_path}'. Please run 'analyze' for project '{project_name}' first.")
             return
         
-        # Remove the strict API key check; processor.py will handle provider logic
-        # api_key = args.api_key or os.getenv("OPENAI_API_KEY")
-        # if not api_key:
-        #     print("Error: API Key is required via --api-key or OPENAI_API_KEY.")
-        #     return
-
-        print(f"Processing '{markdown_path}' -> '{output_path}'")
-        process_content(markdown_path, layouts_path, output_path, api_key_unused=None)
+        print(f"Processing '{markdown_path}' for project '{project_name}' -> '{presentation_output_path}'")
+        process_content(markdown_path, layouts_path, presentation_output_path)
 
     elif args.command == 'generate':
-        # Note: We need to know the *final* presentation name for the output default.
-        # This requires knowing the project name.
-        final_pptx_name = os.path.basename(project_dir) + ".pptx" if project_dir else "output.pptx"
+        presentation_plan_path = os.path.join(output_dir, 'presentation.json')
+        layouts_path = os.path.join(output_dir, 'layouts.json') # Needed to get the template path
+        final_pptx_output_path = os.path.join(output_dir, f"{project_name}.pptx")
 
-        presentation_path = get_path(args.presentation, output_dir, 'presentation.json')
-        output_path = get_path(args.output, output_dir, final_pptx_name)
+        if not os.path.exists(presentation_plan_path):
+            print(f"Error: Presentation plan not found at '{presentation_plan_path}'. Please run 'process' for project '{project_name}' first.")
+            return
+        if not os.path.exists(layouts_path):
+            print(f"Error: Layouts file not found at '{layouts_path}'. Cannot determine source template. Please run 'analyze' for project '{project_name}'.")
+            return
 
-        if not all([presentation_path, output_path, args.template]):
-            print("Error: --presentation, --output, and --template are required when not using the --project flag.")
+        try:
+            with open(layouts_path, 'r', encoding='utf-8') as f:
+                layout_data = json.load(f)
+            source_template_filepath = layout_data.get("source_template_path")
+            if not source_template_filepath or not os.path.exists(source_template_filepath):
+                print(f"Error: Source template path '{source_template_filepath}' from layouts.json is invalid or file not found.")
+                print(f"Please re-run 'analyze' for project '{project_name}' with a valid template.")
+                return
+        except Exception as e:
+            print(f"Error reading source template path from '{layouts_path}': {e}")
             return
         
-        print(f"Generating '{presentation_path}' -> '{output_path}'")
-        # Ensure argument order matches the function definition
+        print(f"Generating '{presentation_plan_path}' for project '{project_name}' using template '{source_template_filepath}' -> '{final_pptx_output_path}'")
         generate_presentation(
-            data_filepath=presentation_path, 
-            template_filepath=args.template, 
-            output_filepath=output_path
+            data_filepath=presentation_plan_path, 
+            template_filepath=source_template_filepath, 
+            output_filepath=final_pptx_output_path
         )
 
     else:
