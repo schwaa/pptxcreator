@@ -1,158 +1,176 @@
-# PPTX Generator
+# PPTX Creator
 
-A command-line tool to convert Markdown content into professional PowerPoint presentations using AI-powered layout selection and customizable templates.
+A command-line tool to convert Markdown content into professional PowerPoint presentations using AI-powered layout selection (via OpenRouter) and customizable templates.
 
 ## Features
 
-- Convert Markdown to PowerPoint presentations
-- AI-powered content analysis and layout selection
-- Template-driven design for consistent branding
-- Local processing with fallback mechanisms
-- Project-based organization
+-   Convert Markdown to PowerPoint presentations.
+-   AI-powered content analysis and layout selection using OpenRouter (model: `deepseek/deepseek-chat-v3-0324:free`).
+-   Template-driven design for consistent branding.
+-   Project-based organization for managing multiple presentations.
+-   Three-step CLI process: `analyze` template, `process` content, `generate` presentation.
+
+## Requirements
+
+-   Python 3.13+
+-   An OpenRouter API key (set as `OPENROUTER_API_KEY` in a `.env` file).
+-   Git (for cloning).
 
 ## Installation
 
-1. **Prerequisites:**
-   - Python 3.13+
-   - An OpenAI API key for AI features
-   
-2. **Clone the repository:**
-   ```bash
-   git clone [your-repo-url]
-   cd pptx-generator
-   ```
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/your-username/pptx-creator.git # Replace with your actual repo URL
+    cd pptx-creator
+    ```
 
-3. **Create a virtual environment:**
-   ```bash
-   python3.13 -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
+2.  **Create and activate a virtual environment:**
+    ```bash
+    python3.13 -m venv venv
+    source venv/bin/activate  # On Windows: venv\Scripts\activate
+    ```
 
-4. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
+3.  **Install dependencies:**
+    ```bash
+    pip install -r requirements.txt
+    # For development (e.g., running tests), also install:
+    # pip install -r requirements-dev.txt
+    ```
 
-5. **Set up your API key:**
-   ```bash
-   export OPENAI_API_KEY="your-api-key-here"
-   # Or use --api-key when running the processor
-   ```
+4.  **Set up your API key:**
+    Create a file named `.env` in the root of the `pptx-creator` directory with your OpenRouter API key:
+    ```env
+    OPENROUTER_API_KEY="your-openrouter-api-key-here"
+    ```
+    This file is already in `.gitignore` to prevent accidental commits of your key.
 
 ## Project Structure
 
+The tool uses a project-based approach. Each presentation you create will reside in its own directory under `projects/`.
+
 ```
-pptx-generator/
-├── projects/                  # All presentations live here
-│   └── example_presentation/
-│       ├── content.md        # Your markdown content
-│       ├── images/           # Images referenced in markdown
-│       └── output/           # Generated files
-│           ├── layouts.json
-│           ├── presentation.json
-│           └── final_deck.pptx
-├── templates/                 # Your PowerPoint templates
-│   └── default_template.pptx
-└── pptx_generator/           # Core package code
-    ├── analyzer.py
-    ├── processor.py
-    ├── generator.py
-    └── main.py
+pptx-creator/
+├── pptx_generator/           # Core package code
+│   ├── main.py               # CLI entry point
+│   ├── analyzer.py           # Template analysis logic
+│   ├── processor.py          # Content processing (LLM)
+│   └── generator.py          # PPTX generation
+├── projects/                  # Your presentations live here
+│   └── <your_project_name>/   # A specific presentation project (e.g., "robotics_report")
+│       ├── content.md        # Your markdown content for this project
+│       ├── images/           # (Optional) Store images referenced in content.md here
+│       └── output/           # Generated files for this project
+│           ├── layouts.json      # Analysis of the template used
+│           ├── presentation.json # Structured plan from your markdown
+│           └── <your_project_name>.pptx # The final PowerPoint file
+├── templates/                 # Store your PowerPoint (.pptx) templates here
+│   └── default_template.pptx # An example template
+├── .env                       # Stores your API key (you create this)
+├── requirements.txt           # Dependencies
+└── README.md                  # This file
 ```
 
-## Usage
+## Usage Workflow
 
-The conversion process happens in three steps:
+The process involves three main commands, all run from the root `pptx-creator` directory:
 
-### 1. Template Analysis
+**Step 0: Prepare Your Content and Template**
 
-First, analyze your PowerPoint template to understand available layouts:
+1.  **Create a PowerPoint Template (`.pptx`):**
+    *   Design your template with various slide layouts (e.g., Title Slide, Title and Content, Section Header, Content with Picture).
+    *   Ensure placeholders within these layouts have distinct names if possible (View -> Slide Master -> Select Layout -> Click on placeholder -> Selection Pane to see/edit name). This helps with accurate content mapping.
+    *   Place your template in the `templates/` directory (e.g., `templates/my_custom_template.pptx`) or note its full path.
+
+2.  **Prepare Your Markdown (`content.md`):**
+    *   For a new presentation, decide on a `project_name` (e.g., `annual_review`). The tool will create `projects/<project_name>/` if it doesn't exist.
+    *   Create a `projects/<project_name>/content.md` file with your presentation content using standard Markdown.
+    *   **Images:** If you use images, you can use standard Markdown syntax: `![Alt text for image](images/my_image.png)`.
+        *   Place the actual image files (e.g., `my_image.png`) inside `projects/<project_name>/images/`.
+        *   The `generator.py` script will attempt to find images relative to this `images/` folder within your project. The LLM currently uses the alt text or image description from the markdown for the `presentation.json`. (Future improvements will aim for the LLM to pass through the actual image path).
+
+**Step 1: Analyze Your Template**
+
+This step inspects your `.pptx` template and creates a `layouts.json` file for your project. This file tells the system about the available slide layouts and their placeholders, and also stores the path to the template that was analyzed.
 
 ```bash
-python -m pptx_generator analyze \
-  --template templates/your_template.pptx \
-  --output projects/your_project/output/layouts.json
+python -m pptx_generator.main analyze <project_name> <template_specifier>
 ```
 
-### 2. Content Processing
+*   `<project_name>`: The name of your project (e.g., `annual_review`).
+*   `<template_specifier>`:
+    *   Either the name of a template file in the `templates/` directory (e.g., `default_template.pptx`).
+    *   Or the full path to a `.pptx` template file (e.g., `/path/to/your/custom_template.pptx`).
 
-Convert your Markdown into a structured presentation plan:
+**Example:**
+```bash
+python -m pptx_generator.main analyze annual_review default_template.pptx
+```
+This will create `projects/annual_review/output/layouts.json`.
+
+**Step 2: Process Your Markdown Content**
+
+This step takes your `projects/<project_name>/content.md` and the `layouts.json` (for layout definitions) and uses an LLM to create a structured `presentation.json`. This JSON file outlines which content goes into which placeholder on which slide layout.
 
 ```bash
-python -m pptx_generator process \
-  --markdown projects/your_project/content.md \
-  --layouts projects/your_project/output/layouts.json \
-  --output projects/your_project/output/presentation.json \
-  --api-key "your-api-key"
+python -m pptx_generator.main process <project_name>
 ```
 
-### 3. Presentation Generation
+*   `<project_name>`: The name of your project (must match the one used in the `analyze` step).
 
-Generate the final PowerPoint file:
+**Example:**
+```bash
+python -m pptx_generator.main process annual_review
+```
+This requires `projects/annual_review/content.md` and `projects/annual_review/output/layouts.json` to exist. It will create `projects/annual_review/output/presentation.json`.
+
+**Step 3: Generate the PowerPoint Presentation**
+
+This final step uses the `presentation.json` and the original template (whose path was stored in `layouts.json`) to generate the final `.pptx` file.
 
 ```bash
-python -m pptx_generator generate \
-  --presentation projects/your_project/output/presentation.json \
-  --template templates/your_template.pptx \
-  --output projects/your_project/output/final_deck.pptx
+python -m pptx_generator.main generate <project_name>
 ```
 
-## Markdown Format
+*   `<project_name>`: The name of your project.
 
-Your Markdown content should use standard formatting:
-
-```markdown
-# Title of Presentation
-## Subtitle
-By Author Name
-
----
-
-# Section Title
-- Bullet point 1
-- Bullet point 2
-- Bullet point 3
-
----
-
-# Image Slide
-![Description](images/example.png)
-Additional text description
-
----
-
-# Next Steps
-1. First action item
-2. Second action item
-3. Third action item
+**Example:**
+```bash
+python -m pptx_generator.main generate annual_review
 ```
+This requires `projects/annual_review/output/presentation.json` and `projects/annual_review/output/layouts.json` to exist. It will create `projects/annual_review/output/annual_review.pptx`.
 
-## Template Requirements
+## Key Data Files Explained
 
-- Use PowerPoint (.pptx) templates only
-- Define clear layouts with named placeholders
-- Include at least:
-  - Title slide layout
-  - Section header layout
-  - Content slide layout
-  - Image with caption layout
+*   **`projects/<project_name>/content.md` (Input):** Your raw presentation content in Markdown.
+*   **`templates/<template_name>.pptx` (Input):** Your PowerPoint template.
+*   **`projects/<project_name>/output/layouts.json` (Intermediate):**
+    *   Generated by the `analyze` command.
+    *   Contains `source_template_path` (path to the PPTX template used).
+    *   Contains `layouts`: an array of available slide layouts from the template, each with its `name` and an array of its `placeholders` (names of placeholder shapes).
+*   **`projects/<project_name>/output/presentation.json` (Intermediate):**
+    *   Generated by the `process` command.
+    *   Contains `slides`: an array of slide plans. Each slide plan specifies the `layout` name to use and a `placeholders` dictionary. This dictionary maps placeholder names (e.g., "Title 1", "Content Placeholder 2") to the content (string or list of strings for text, or a descriptive string for images that `generator.py` tries to resolve).
+*   **`projects/<project_name>/output/<project_name>.pptx` (Output):** The final generated PowerPoint presentation.
 
-## Error Handling
+## Troubleshooting & Known Issues
 
-The system includes robust error handling:
-
-- Template validation during analysis
-- Fallback to rule-based processing if AI fails
-- Clear error messages and suggestions
-- Default layouts when specific layouts unavailable
+*   **API Key:** Ensure `OPENROUTER_API_KEY` is correctly set in your `.env` file in the project root.
+*   **Template Placeholders:** For best results, ensure your PPTX template layouts have clearly named placeholders. Unnamed or generically named placeholders might lead to less predictable content mapping.
+*   **Image Handling:**
+    *   The system currently relies on the LLM to interpret image references in markdown. The `generator.py` script then attempts to find image files based on the string provided by the LLM for picture placeholders.
+    *   Place images in `projects/<project_name>/images/` and reference them like `![alt text](images/my_image.png)` in your `content.md`.
+    *   If an image file is not found, the picture placeholder will likely remain empty (descriptive text will not be inserted into picture placeholders).
+*   **LLM Output:** The quality of the `presentation.json` (and thus the final PPTX) depends on the LLM's ability to structure the content appropriately. The `processor.py` includes a basic fallback parser if the LLM output is unusable.
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
+Contributions are welcome! Please follow these steps:
+1.  Fork the repository.
+2.  Create a feature branch (`git checkout -b feature/AmazingFeature`).
+3.  Commit your changes (`git commit -m 'Add some AmazingFeature'`).
+4.  Push to the branch (`git push origin feature/AmazingFeature`).
+5.  Open a Pull Request.
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License. See the `LICENSE` file for details.

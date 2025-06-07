@@ -11,55 +11,132 @@ from .utils import clean_text_for_presentation
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 
 PROMPT_TEMPLATE = """
-You are an expert presentation designer's assistant. Your primary goal is to convert raw Markdown content into a structured JSON object.
+You are an expert presentation designer's assistant. Your primary goal is to select the best possible slide layout for a given piece of content and structure the output as a JSON object.
 
-**CONTENT FORMATTING RULES:**
-1.  **For Bullet Points:** If the content for a placeholder is a list of items, format its value as a JSON ARRAY of strings.
-    - Example: `"Content Placeholder 2": ["First bullet point.", "Second bullet point."]`
-2.  **For Paragraphs:** If the content is a paragraph, reformat it into a JSON ARRAY of strings, where each string is a concise sentence.
-3.  **For Simple Text:** If the content is a title or a short phrase, format its value as a single JSON string.
-    - Example: `"Title 1": "This is a Title"`
-4.  **Cleanup:** Ensure all text in the final JSON is clean plain text. REMOVE all markdown formatting like '-', '*', '#', or '**'.
+**OUTPUT JSON STRUCTURE:**
+The output MUST be a single JSON object with a root key "slides".
+"slides" is a JSON array of slide objects.
+Each slide object MUST have two keys:
+1.  `"layout"`: (string) The name of the layout to use for this slide, chosen from the AVAILABLE LAYOUTS JSON.
+2.  `"placeholders"`: (JSON object) A map where keys are placeholder names (strings from the chosen layout's "placeholders" object in AVAILABLE LAYOUTS JSON) and values are the content for those placeholders.
+
+**LAYOUT SELECTION RULES:**
+1.  Analyze the user's MARKDOWN CONTENT for a given slide (e.g., is it a title? A paragraph? A list of bullets? An image `![alt text](image.path)`)?
+2.  Review the `AVAILABLE_LAYOUTS_JSON`. This file describes each layout, including the `type` (e.g., "TITLE", "BODY", "PICTURE") and percentage-based `left_pct`, `top_pct`, `width_pct`, `height_pct` of its placeholders.
+3.  **Make a smart design choice.**
+    - If the content is a long list of bullet points, prefer a layout with a large "BODY" or "OBJECT" type placeholder (check `height_pct` and `width_pct`).
+    - If the content includes an image (e.g., `![alt text for image](image.png)`), choose a layout with a "PICTURE" placeholder. Consider the `alt text` as the content for this "PICTURE" placeholder. The actual image embedding is handled later.
+    - Ensure the chosen layout can accommodate all distinct pieces of content for the slide. For example, if there's a title, body text, and an image, select a layout that has placeholders suitable for all three.
+    - Do not choose a "Two Content" or similar layout (e.g., one with two "OBJECT" or "BODY" placeholders side-by-side) if the markdown content for a slide segment is clearly a single block of text and a single image. Instead, find a layout designed for one text block and one picture.
+4.  Based on your choice, generate a JSON object for the slide, mapping the content to the correct placeholder names from the chosen layout in `AVAILABLE_LAYOUTS_JSON`.
+
+**CONTENT FORMATTING RULES FOR PLACEHOLDER VALUES:**
+1.  **For Bullet Points or Paragraphs:** If the content for a placeholder is a list of items or a paragraph, format its value as a JSON ARRAY of strings. Each string in the array should be a single bullet point or a concise sentence from the paragraph.
+    - Example within "placeholders" map: `"Body Placeholder 1": ["First bullet point.", "Second bullet point."]`
+    - Example for paragraph: `"Text Placeholder 2": ["This is the first sentence.", "This is the second sentence."]`
+2.  **For Titles or Simple Text (including image alt text for PICTURE placeholders):** If the content is a title, a short phrase, or alt text for an image, format its value as a single JSON string.
+    - Example within "placeholders" map: `"Title 1": "This is a Title"`
+    - Example for image alt text: `"Picture Placeholder 1": "A majestic mountain range at sunset"`
+3.  **Cleanup:** Ensure all text in the final JSON is clean plain text. REMOVE all markdown formatting like '-', '*', '#', or '**'.
 
 ---
-**AVAILABLE LAYOUTS JSON:**
+**AVAILABLE LAYOUTS JSON (describes layout names, and for each layout, its placeholders with their types and dimensions):**
 {layouts_json}
 
 ---
-**MARKDOWN CONTENT:**
+**MARKDOWN CONTENT (segment this into slides and map to layouts/placeholders based on the rules above):**
 {markdown_content}
 ---
 
 **YOUR TASK:**
-Generate a single, valid JSON object that strictly follows all rules above. The 'content' values must be either a single JSON string or a JSON array of strings.
+Generate a single, valid JSON object adhering to the **OUTPUT JSON STRUCTURE**, **LAYOUT SELECTION RULES**, and **CONTENT FORMATTING RULES** above.
 """
 
 # Fallback parser for when LLM fails or is unavailable
-def fallback_parser(markdown_content):
+def fallback_parser(markdown_content, layouts_data):
     """
-    Simple fallback: splits markdown into slides by '---' and uses a default layout.
+    Simple fallback: splits markdown into slides by '---' and uses a dynamically chosen layout.
     """
     slides = []
+    
+    # Determine a suitable fallback layout and its placeholders
+    fallback_layout_name = "Title Slide" # Default default
+    title_ph_name = "Title 1" # Default default
+    content_ph_name = "Subtitle 2" # Default default
+
+    available_layouts = layouts_data.get("layouts", [])
+    
+    if available_layouts:
+        # The structure of l.get("placeholders", {}) is now a dictionary:
+        # {"PlaceholderName1": {"type": "TITLE", ...}, "PlaceholderName2": {"type": "BODY", ...}}
+        # So, len(l.get("placeholders", {})) or len(l.get("placeholders", {}).keys()) gives the count.
+
+        # Try to find a 'Title and Content' like layout
+        preferred_layouts = [
+            l for l in available_layouts
+            if "title" in l["name"].lower() and "content" in l["name"].lower() and len(l.get("placeholders", {}).keys()) >= 2
+        ]
+        if not preferred_layouts: # Try single column general layouts
+            preferred_layouts = [
+                l for l in available_layouts
+                if "general" in l["name"].lower() and "single column" in l["name"].lower() and len(l.get("placeholders", {}).keys()) >= 2
+            ]
+        if not preferred_layouts: # Try any layout with at least 2 placeholders
+            preferred_layouts = [l for l in available_layouts if len(l.get("placeholders", {}).keys()) >= 2]
+        
+        if preferred_layouts:
+            chosen_layout = preferred_layouts[0] # Take the first suitable one
+            fallback_layout_name = chosen_layout["name"]
+            # Get placeholder names from the keys of the placeholders dictionary
+            placeholder_names = list(chosen_layout.get("placeholders", {}).keys())
+            if placeholder_names:
+                title_ph_name = placeholder_names[0]
+            if len(placeholder_names) > 1:
+                content_ph_name = placeholder_names[1]
+            else: # Only one placeholder, use it for title, content will be appended or ignored
+                content_ph_name = None
+        else: # Still no good layout, take the first one with at least one placeholder
+            first_layout_with_ph = next((l for l in available_layouts if l.get("placeholders", {})), None)
+            if first_layout_with_ph:
+                fallback_layout_name = first_layout_with_ph["name"]
+                placeholder_names = list(first_layout_with_ph.get("placeholders", {}).keys())
+                if placeholder_names:
+                    title_ph_name = placeholder_names[0]
+                content_ph_name = None # No second placeholder for sure if we are in this block
+            else: # Absolute fallback: use a generic name, generator might skip
+                logging.warning("No suitable fallback layout with placeholders found in layouts_data. Using generic names.")
+                fallback_layout_name = "Fallback Layout" 
+                title_ph_name = "Title Placeholder"
+                content_ph_name = "Content Placeholder"
+
+    logging.info(f"Fallback parser using layout: '{fallback_layout_name}' with title placeholder: '{title_ph_name}' and content placeholder: '{content_ph_name or 'N/A'}'")
+
     for slide_md in markdown_content.split('---'):
         slide_md = slide_md.strip()
         if not slide_md:
             continue
         lines = slide_md.splitlines()
-        title = lines[0].strip('# ').strip() if lines else ""
-        body = "\n".join(lines[1:]).strip() if len(lines) > 1 else ""
-        # If body is empty, make up some content
-        if not body:
-            body = "This is sample body text generated to ensure the slide is not empty. Add your own content here."
+        title = lines[0].strip('# ').strip() if lines else "Untitled Slide"
+        body_lines = [line.strip() for line in lines[1:] if line.strip()]
         
+        # Ensure body is an array of strings, even if empty or single line
+        if not body_lines:
+            body = ["This is sample body text generated to ensure the slide is not empty. Add your own content here."]
+        else:
+            body = [clean_text_for_presentation(b_line) for b_line in body_lines]
+
         cleaned_title = clean_text_for_presentation(title)
-        cleaned_body = clean_text_for_presentation(body)
+        
+        slide_content = {title_ph_name: cleaned_title}
+        if content_ph_name:
+            slide_content[content_ph_name] = body if body else [""] # Ensure body is always a list
+        elif body: # No dedicated content placeholder, append to title if title_ph exists
+             slide_content[title_ph_name] = f"{cleaned_title}\n{'\n'.join(body)}"
+
 
         slides.append({
-            "layout": "Title, Content 1", # Updated to a valid layout name from default_template.pptx
-            "content": {
-                "Title 1": cleaned_title,
-                "Content Placeholder 2": cleaned_body
-            }
+            "layout": fallback_layout_name,
+            "placeholders": slide_content
         })
     return {"slides": slides}
 
@@ -134,12 +211,14 @@ def process_content(markdown_filepath, layouts_filepath, output_filepath, api_ke
     try:
         with open(layouts_filepath, 'r', encoding='utf-8') as f:
             layouts_content = f.read()
+            # Parse layouts_content to be available for fallback_parser
+            layouts_data = json.loads(layouts_content) 
     except Exception as e:
-        logging.error(f"Error reading layouts file '{layouts_filepath}': {e}")
-        # Fallback: if layouts.json is missing or unreadable, provide an empty JSON object string
-        # This allows the LLM to proceed, though it won't have specific layout info.
-        logging.warning(f"Layouts file '{layouts_filepath}' not found or unreadable. Proceeding without specific layout info.")
-        layouts_content = "{}"
+        logging.error(f"Error reading or parsing layouts file '{layouts_filepath}': {e}")
+        # Fallback: if layouts.json is missing, unreadable, or invalid JSON
+        logging.warning(f"Layouts file '{layouts_filepath}' not found, unreadable, or invalid. Proceeding with empty layouts_data for fallback.")
+        layouts_content = "{}" # For LLM prompt
+        layouts_data = {"layouts": []} # For fallback_parser
 
     # Build prompts
     system_prompt = (
@@ -153,15 +232,24 @@ def process_content(markdown_filepath, layouts_filepath, output_filepath, api_ke
     llm_response = call_llm(system_prompt, user_prompt, model_name=model_name)
 
     if llm_response:
+        # Ensure the "placeholders" key is used, not "content"
+        for slide in llm_response.get("slides", []):
+            if "content" in slide and "placeholders" not in slide:
+                slide["placeholders"] = slide.pop("content")
+
         if "slides" not in llm_response or not isinstance(llm_response["slides"], list):
             logging.warning("LLM response is missing 'slides' key or is not a list. Using fallback.")
-            presentation_structure = fallback_parser(markdown_content)
+            presentation_structure = fallback_parser(markdown_content, layouts_data)
         else:
             # --- START OF DEFINITIVE FIX (incorporating ast.literal_eval) ---
             logging.info("Sanitizing and cleaning LLM response...")
-            for slide in llm_response["slides"]:
-                if "content" in slide and isinstance(slide["content"], dict):
-                    for key, value in list(slide["content"].items()): # Iterate over a copy
+            for slide in llm_response["slides"]: # Iterate over llm_response["slides"]
+                # Ensure the "placeholders" key is used, not "content"
+                if "content" in slide and "placeholders" not in slide:
+                    slide["placeholders"] = slide.pop("content")
+
+                if "placeholders" in slide and isinstance(slide["placeholders"], dict): # Check "placeholders"
+                    for key, value in list(slide["placeholders"].items()): # Iterate over a copy
                         
                         # STEP 1: Fix stringified lists from the LLM.
                         if isinstance(value, str) and value.strip().startswith('[') and value.strip().endswith(']'):
@@ -176,17 +264,18 @@ def process_content(markdown_filepath, layouts_filepath, output_filepath, api_ke
                         
                         # STEP 2: Clean the final values (which are now correctly typed or original string).
                         if isinstance(value, str):
-                            slide["content"][key] = clean_text_for_presentation(value)
+                            slide["placeholders"][key] = clean_text_for_presentation(value)
                         elif isinstance(value, list):
                             # Clean each string item within the list, keep non-strings as is
-                            slide["content"][key] = [clean_text_for_presentation(item) if isinstance(item, str) else item for item in value]
+                            slide["placeholders"][key] = [clean_text_for_presentation(item) if isinstance(item, str) else item for item in value]
             
             # --- Post-cleanup: Handle empty placeholders ---
-            for slide in llm_response["slides"]:
-                placeholders = slide.get("content", {})
-                for placeholder_key in ["Content Placeholder 2", "Content Placeholder 6", "Content Placeholder 7"]:
-                    if placeholder_key in placeholders:
-                        content_value = placeholders[placeholder_key]
+            for slide in llm_response["slides"]: # Iterate over llm_response["slides"]
+                current_placeholders = slide.get("placeholders", {}) # Check "placeholders"
+                # Removed content_ph_name from this list as it's not defined in this scope
+                for placeholder_key in ["Content Placeholder 2", "Content Placeholder 6", "Content Placeholder 7"]: 
+                    if placeholder_key and placeholder_key in current_placeholders: # Check if placeholder_key is not None
+                        content_value = current_placeholders[placeholder_key]
                         is_empty = False
                         if isinstance(content_value, str):
                             if not content_value or not content_value.strip():
@@ -198,12 +287,12 @@ def process_content(markdown_filepath, layouts_filepath, output_filepath, api_ke
                                 is_empty = all(not item or (isinstance(item, str) and not item.strip()) for item in content_value)
                         
                         if is_empty:
-                            placeholders[placeholder_key] = "This is sample body text generated to ensure the slide is not empty. Add your own content here."
+                            current_placeholders[placeholder_key] = "This is sample body text generated to ensure the slide is not empty. Add your own content here."
             presentation_structure = llm_response
             # --- END OF DEFINITIVE FIX ---
     else:
         logging.warning("LLM processing failed or no response. Using fallback parser.")
-        presentation_structure = fallback_parser(markdown_content)
+        presentation_structure = fallback_parser(markdown_content, layouts_data)
     
     if presentation_structure:
         try:

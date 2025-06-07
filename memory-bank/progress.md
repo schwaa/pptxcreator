@@ -1,7 +1,7 @@
 # Project Progress
 
 ## Current Focus
-Core functionality for the three-component architecture (`analyze`, `process`, `generate`) is complete, with the system now generating PPTX files with content. Focus is shifting to refining image handling, enhancing robustness, and expanding test coverage.
+Core text-based presentation generation functionality is stable. The focus is now on **refining image handling, enhancing overall robustness, and significantly expanding test coverage.**
 
 ## Completed Items
 1.  **Project Setup**
@@ -33,28 +33,27 @@ Core functionality for the three-component architecture (`analyze`, `process`, `
 
 ## In Progress
 1.  **Memory Bank Update:**
-    *   🔄 Updating all memory bank files to reflect current project state and learnings.
+    *   ✅ All memory bank files updated to reflect current project state and learnings (as of this update).
 2.  **Image Handling Refinement:**
-    *   🔄 Planning improvements for robust image path specification and embedding.
+    *   🔄 Actively defining strategy and planning implementation for robust image path specification and embedding.
 3.  **Testing Framework & Coverage:**
-    *   🔄 Test structure setup.
-    *   🔄 Planning for comprehensive unit and integration tests.
+    *   🔄 Expanding unit and integration tests.
 
 ## Pending Tasks (Major Next Steps)
 
-### Phase 1: Stabilization & Enhancement
-1.  **Image Handling Implementation**
-    *   ⏳ Define how image paths are specified in `content.md`.
-    *   ⏳ Update `processor.py` (LLM prompt) to extract image filenames/paths.
-    *   ⏳ Enhance `generator.py` for robust image finding (relative to project, `images/` folder, absolute) and embedding.
-2.  **Testing Suite Expansion**
+### Phase 1: Enhancements & Testing (Core functionality stable)
+1.  **Image Handling Implementation (Primary Focus)**
+    *   ⏳ Define how image paths are specified in `content.md` and represented in `presentation.json`.
+    *   ⏳ Update `processor.py` (LLM prompt and parsing) to correctly extract and structure image information.
+    *   ⏳ Enhance `generator.py` for robust image finding (relative to project, `images/` folder, absolute paths) and embedding.
+2.  **Testing Suite Expansion (High Priority)**
     *   ⏳ Write comprehensive unit tests for `analyzer.py`, `processor.py`, `generator.py`.
     *   ⏳ Develop integration tests for the full `analyze` -> `process` -> `generate` workflow.
-    *   ⏳ Test with various templates and content types.
-3.  **Error Handling & Robustness**
-    *   ⏳ Review and improve error messages across all components.
-    *   ⏳ Strengthen validation for `layouts.json` and `presentation.json`.
-    *   ⏳ Improve fallback mechanisms.
+    *   ⏳ Test with various templates and content types (including images once implemented).
+3.  **Error Handling & Robustness (Ongoing Refinement)**
+    *   ⏳ Review and improve error messages across all components for clarity and actionability.
+    *   ⏳ Strengthen validation for `layouts.json` and `presentation.json` if new edge cases are found.
+    *   ⏳ Improve fallback mechanisms where appropriate.
 
 ### Documentation
 1.  **User Guide Updates**
@@ -63,21 +62,22 @@ Core functionality for the three-component architecture (`analyze`, `process`, `
     *   ⏳ Ensure component interfaces, data schemas, and error codes are well-documented.
 
 ## Known Issues
-1.  **Image Handling:** Current implementation is basic (treats image placeholder content as text if image file not found by its descriptive name). This is the next major area for improvement.
-2.  **Test Coverage:** While core functionality works, comprehensive automated tests are still needed.
-3.  **Advanced Placeholder Types:** Support for charts, tables, etc., is not yet implemented.
+1.  **Image Handling:** Current implementation is very basic (treats image placeholder content as text if an image file is not found by its descriptive name). This is the **primary area for upcoming development.**
+2.  **Test Coverage:** While core functionality is stable, comprehensive automated test coverage (unit and integration) is still being expanded.
+3.  **Advanced Placeholder Types:** Support for charts, tables, and other complex content types is not yet implemented and remains a future enhancement.
 
 ## Next Milestones
 
-### v0.2.0 - Core Functionality Complete (Achieved)
-- ✅ `analyze`, `process`, `generate` commands functional.
-- ✅ Text content successfully populated in presentations.
-- ✅ Basic LLM integration for content structuring.
+### v0.2.0 - Core Functionality Complete (✅ Achieved)
+- ✅ `analyze`, `process`, `generate` commands functional for text-based content.
+- ✅ Text content (including lists) successfully populated in presentations.
+- ✅ LLM integration for content structuring and layout mapping is operational.
+- ✅ Data flow between components and JSON contracts (`layouts.json`, `presentation.json`) are stable.
 
-### v0.3.0 - Robust Image Handling & Testing
-- Implement robust image path specification and embedding.
-- Significantly increase unit and integration test coverage.
-- Refine error handling.
+### v0.3.0 - Robust Image Handling & Comprehensive Testing (Current Target)
+- 🎯 Implement robust image path specification, processing, and embedding.
+- 🎯 Significantly increase unit and integration test coverage.
+- 🎯 Continue refining error handling and user experience.
 - Target: Next 1-2 weeks.
 
 ### v0.4.0 - Advanced Features & Documentation

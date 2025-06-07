@@ -1,20 +1,20 @@
 # Active Context
 
 ## Current Work Focus
-The core functionality of the three-component architecture (analyze, process, generate) is now largely in place and producing presentations with content. Current focus is on ensuring robustness, refining image handling, and preparing for more comprehensive testing.
+The core functionality of the three-component architecture (analyze, process, generate) is now stable and producing presentations with text content. The current focus is shifting to **Feature Enhancement (Image Handling) and Comprehensive Testing**.
 
-### Current Implementation Phase: Stabilization and Refinement
-- Verification of data flow between components.
-- Ensuring `presentation.json` structure is consistently produced and consumed.
-- Basic image placeholder handling (text description populates placeholder if image file not found).
+### Current Implementation Phase: Enhancements and Testing
+- Robust image handling implementation.
+- Expansion of unit and integration test coverage.
+- Continued refinement of error handling and user feedback.
 
 ```mermaid
 graph TD
-    A[Current Focus] --> B[System Stability & Refinement]
-    B --> C[Verify Data Contracts (layouts.json, presentation.json)]
-    B --> D[Refine Image Handling in Generator]
-    B --> E[Comprehensive Testing]
-    B --> F[Memory Bank Update - In Progress]
+    A[Current Focus] --> B[Feature Enhancement & Testing]
+    B --> C[Robust Image Handling]
+    B --> D[Expand Test Suite]
+    B --> E[Refine Error Handling/UX]
+    B --> F[Memory Bank Updated]
 ```
 
 ## Component Architecture & Data Flow (Confirmed)
@@ -61,12 +61,18 @@ graph TD
 - **Error Handling:** While improved, continue to refine error messages and recovery paths.
 
 ## Immediate Next Steps
-1.  **Finalize Memory Bank Update:** Complete updates for all memory bank files.
-2.  **Image Handling Refinement (Next Major Task):**
-    *   Decide on a strategy for how image paths are specified in `content.md` and represented in `presentation.json`.
-    *   Update `processor.py` (LLM prompt) if necessary to extract image filenames.
-    *   Enhance `generator.py` to robustly find and embed images.
-3.  **Expand Test Suite:** Add more test cases.
+1.  **Memory Bank Update:** (Completed with this update)
+2.  **Image Handling Refinement (Primary Focus):**
+    *   Define a clear strategy for image path specification in `content.md` and its representation in `presentation.json`.
+    *   Update `processor.py` (LLM prompt and parsing) to correctly extract and structure image information (e.g., filenames, alt text).
+    *   Enhance `generator.py` to robustly locate image files (relative to project, `images/` folder, or absolute paths) and embed them into presentations.
+3.  **Expand Test Suite:**
+    *   Develop comprehensive unit tests for each module (`analyzer.py`, `processor.py`, `generator.py`).
+    *   Create integration tests for the end-to-end `analyze` -> `process` -> `generate` workflow.
+    *   Include tests for various template structures and content types (including images once implemented).
+4.  **Error Handling and UX Refinements:**
+    *   Review and improve error messages for clarity and actionability.
+    *   Strengthen input validation.
 
 ## Open Questions
 - How should users specify image paths in `content.md` for them to be correctly processed and embedded?
