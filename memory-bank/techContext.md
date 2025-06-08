@@ -9,7 +9,6 @@
 - OpenRouter API (content analysis, model: `deepseek/deepseek-chat-v3-0324:free`)
 - `Pillow` library (image handling - basic, for future enhancement)
 - `pydantic` (data modeling and validation, especially for LLM interactions)
-- `pydantic-ai` (or relevant modules from the Pydantic AI ecosystem, for ensuring LLM output conforms to Pydantic models)
 - `argparse` (CLI argument parsing in `main.py`)
 - `json` (for data contracts: `layouts.json`, `presentation.json`)
 - `os` (for path manipulation)
@@ -66,7 +65,7 @@ python-pptx>=0.6.23
 openai>=1.3.0         # For OpenRouter API client
 python-dotenv>=1.0.0
 pydantic>=2.0.0       # For data modeling and validation
-pydantic-ai           # For Pydantic model validation with LLM client (exact package name and version TBD)
+# pydantic-ai           # For Pydantic model validation with LLM client (not used)
 # Pillow might be added if image generation/manipulation becomes more direct
 # requests is a transitive dependency of openai, or can be used directly
 ```

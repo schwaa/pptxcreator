@@ -80,16 +80,16 @@ flowchart TD
     - **Step 1: Planning Agent (`call_planning_llm`)**
         - Input: A markdown chunk, `layouts_json`.
         - LLM (e.g., GPT-4 Turbo via OpenRouter) is called with a focused prompt.
-        - Output: A `SlidePlan` Pydantic model, validated by `instructor`. This model includes `slide_topic`, `content_type`, `raw_content`, and an optional `image_request` (which itself is an `ImageGenerationRequest` Pydantic model detailing an image prompt).
+        - Output: A `SlidePlan` Pydantic model, validated directly with Pydantic. This model includes `slide_topic`, `content_type`, `raw_content`, and an optional `image_request` (which itself is an `ImageGenerationRequest` Pydantic model detailing an image prompt).
     - **Step 2: Tool Use (Image Generation - Optional)**
         - If `SlidePlan.image_request` is present, the `generate_and_save_image` helper function is called with the prompt from `ImageGenerationRequest`.
         - Output: Path to the generated image.
     - **Step 3: Designer Agent (`call_designer_llm`)**
         - Input: The `SlidePlan`, the optional `image_path` from Step 2, and `layouts_json`.
         - LLM is called with a prompt focused on generating the final slide structure.
-        - Output: A `FinalSlide` Pydantic model, validated by `instructor`. This model contains the chosen `layout` (string) and `placeholders` (dictionary mapping placeholder names to content, which can be text, lists of text, or an image path).
+        - Output: A `FinalSlide` Pydantic model, validated directly with Pydantic. This model contains the chosen `layout` (string) and `placeholders` (dictionary mapping placeholder names to content, which can be text, lists of text, or an image path).
     - The `FinalSlide.model_dump()` is appended to the `slides` list in `presentation.json`.
-    - Uses `instructor` library with `openai` client to ensure LLM outputs conform to Pydantic models (`SlidePlan`, `FinalSlide`).
+    - Pydantic is used directly to ensure LLM outputs conform to the expected models (`SlidePlan`, `FinalSlide`).
     - A new `pptx_generator/models.py` file defines these Pydantic models: `ImageGenerationRequest`, `SlidePlan`, `FinalSlide`.
     - Fallback parsing logic might be adjusted or simplified due to Pydantic validation.
 
@@ -164,7 +164,7 @@ flowchart TD
 ## Design Patterns
 - **CLI Facade (`main.py`):** Simplifies user interaction with the three-stage process.
 - **Agentic Workflow (in `processor.py`):** A multi-step process where an "agent" (the `process_content` function) uses specialized LLM calls (Planning Agent, Designer Agent) and Pydantic models to make decisions, execute actions (like image generation), and format outputs for each slide.
-- **Pydantic Models (in `models.py`):** Used for data validation and to define clear, structured inputs and outputs for LLM interactions, enforced by the `instructor` library.
+- **Pydantic Models (in `models.py`):** Used for data validation and to define clear, structured inputs and outputs for LLM interactions, enforced directly by Pydantic.
 - **Strategy Pattern (in `processor.py` - potentially evolving):** The LLM-based processing is primary. The rule-based fallback might be re-evaluated or simplified given the robustness introduced by Pydantic validation at each LLM step.
 - **Data-Driven Configuration:** `layouts.json` and `presentation.json` drive the generation process.
 
