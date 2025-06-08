@@ -15,6 +15,19 @@ flowchart TD
     UserInputMd --> B
     B -- markdown_content, layout_definitions --> Processor(processor.py w/ LLM)
     Processor -- presentation.json --> ProjectFiles2[/projects/project_name/output/presentation.json/]
+
+    subgraph "Processor Internals (Agentic Workflow)"
+        direction LR
+        MarkdownChunk[Markdown Chunk] --> PlanLLM{call_planning_llm}
+        LayoutsJsonIn[layouts.json] --> PlanLLM
+        PlanLLM -- SlidePlan (Pydantic) --> ExecutePlan{Execute Plan}
+        ExecutePlan -- Optional ImageGenerationRequest --> ImageGen[Optional: generate_and_save_image]
+        ImageGen -- Optional image_path --> DesignLLM{call_designer_llm}
+        SlidePlan --> DesignLLM
+        LayoutsJsonIn --> DesignLLM
+        DesignLLM -- FinalSlide (Pydantic) --> FinalSlideOutput[FinalSlide.model_dump()]
+        FinalSlideOutput --> Processor
+    end
     
     ProjectFiles2 --> C(main.py generate)
     ProjectFiles1 -- source_template_path --> C
@@ -56,16 +69,29 @@ flowchart TD
 - **Key Logic:** Uses `python-pptx` to inspect slide masters and layouts.
 
 ### 2. Content Processor (`processor.py`)
-- **Purpose:** Convert markdown content into a structured presentation plan using LLM, guided by available layouts.
+- **Purpose:** Convert markdown content into a structured presentation plan using an agentic, multi-step LLM process with Pydantic validation, guided by available layouts.
 - **Input:**
-    - Path to `content.md`.
-    - Path to `layouts.json` (to provide layout definitions to the LLM).
+    - Path to `content.md` (processed in chunks).
+    - Path to `layouts.json` (provides layout definitions).
 - **Output:** `presentation.json` file containing:
-    - `slides`: A list of slide definitions, each with a `layout` (name) and a `placeholders` dictionary mapping placeholder names to content (string or list of strings).
-- **Key Logic:**
-    - Sends markdown and layout information to an LLM (OpenRouter, model: `deepseek/deepseek-chat-v3-0324:free` via `openai` library).
-    - Parses LLM response (JSON), using `ast.literal_eval` for stringified lists.
-    - Includes a fallback parser for basic content structuring if LLM fails.
+    - `slides`: A list of slide definitions, each conforming to the `FinalSlide` Pydantic model structure (see Data Contracts below).
+- **Key Logic (Agentic Workflow):**
+    - The `process_content` function iterates through markdown chunks (separated by `---`).
+    - **Step 1: Planning Agent (`call_planning_llm`)**
+        - Input: A markdown chunk, `layouts_json`.
+        - LLM (e.g., GPT-4 Turbo via OpenRouter) is called with a focused prompt.
+        - Output: A `SlidePlan` Pydantic model, validated by `instructor`. This model includes `slide_topic`, `content_type`, `raw_content`, and an optional `image_request` (which itself is an `ImageGenerationRequest` Pydantic model detailing an image prompt).
+    - **Step 2: Tool Use (Image Generation - Optional)**
+        - If `SlidePlan.image_request` is present, the `generate_and_save_image` helper function is called with the prompt from `ImageGenerationRequest`.
+        - Output: Path to the generated image.
+    - **Step 3: Designer Agent (`call_designer_llm`)**
+        - Input: The `SlidePlan`, the optional `image_path` from Step 2, and `layouts_json`.
+        - LLM is called with a prompt focused on generating the final slide structure.
+        - Output: A `FinalSlide` Pydantic model, validated by `instructor`. This model contains the chosen `layout` (string) and `placeholders` (dictionary mapping placeholder names to content, which can be text, lists of text, or an image path).
+    - The `FinalSlide.model_dump()` is appended to the `slides` list in `presentation.json`.
+    - Uses `instructor` library with `openai` client to ensure LLM outputs conform to Pydantic models (`SlidePlan`, `FinalSlide`).
+    - A new `pptx_generator/models.py` file defines these Pydantic models: `ImageGenerationRequest`, `SlidePlan`, `FinalSlide`.
+    - Fallback parsing logic might be adjusted or simplified due to Pydantic validation.
 
 ### 3. Presentation Generator (`generator.py`)
 - **Purpose:** Create the final PPTX presentation by populating a template with content from the presentation plan.
@@ -106,13 +132,13 @@ flowchart TD
 ```
 
 ### 2. `presentation.json`
-**Purpose:** Define presentation content and structure, mapping content to specific placeholders in chosen layouts.
+**Purpose:** Define presentation content and structure, mapping content to specific placeholders in chosen layouts. This structure will reflect the `FinalSlide.model_dump()` output from the new agentic processor.
 ```json
 {
   "slides": [
     {
-      "layout": "Title Slide",
-      "placeholders": {
+      "layout": "Title Slide", // From FinalSlide.layout
+      "placeholders": {        // From FinalSlide.placeholders
         "Title 1": "The Future of AI",
         "Subtitle 2": "A Presentation by Jane Doe"
       }
@@ -125,18 +151,21 @@ flowchart TD
             "Rise of Transformers",
             "Open Source Models",
             "Multimodal Capabilities"
-        ]
+        ],
+        "ImagePlaceholder1": "path/to/generated_or_existing_image.jpg" // Example if image was part of FinalSlide
       }
     }
     // ... more slides
   ]
 }
 ```
-*Note: The key for the content map per slide is `placeholders`.*
+*Note: The key for the content map per slide is `placeholders`. The structure of each slide object will conform to the `FinalSlide` Pydantic model.*
 
 ## Design Patterns
 - **CLI Facade (`main.py`):** Simplifies user interaction with the three-stage process.
-- **Strategy Pattern (in `processor.py`):** LLM-based processing as primary, with a rule-based fallback.
+- **Agentic Workflow (in `processor.py`):** A multi-step process where an "agent" (the `process_content` function) uses specialized LLM calls (Planning Agent, Designer Agent) and Pydantic models to make decisions, execute actions (like image generation), and format outputs for each slide.
+- **Pydantic Models (in `models.py`):** Used for data validation and to define clear, structured inputs and outputs for LLM interactions, enforced by the `instructor` library.
+- **Strategy Pattern (in `processor.py` - potentially evolving):** The LLM-based processing is primary. The rule-based fallback might be re-evaluated or simplified given the robustness introduced by Pydantic validation at each LLM step.
 - **Data-Driven Configuration:** `layouts.json` and `presentation.json` drive the generation process.
 
 ## Error Handling Strategy

@@ -2,306 +2,389 @@ import os
 import json
 import re
 import logging
-import ast # <-- Add this import
+import requests # For image generation
 from openai import OpenAI
 from dotenv import load_dotenv
-from .utils import clean_text_for_presentation
+# import instructor # TODO: Replace with pydantic-ai imports
+
+from .utils import clean_text_for_presentation # Assuming this is still needed for some raw_content processing
+from .models import SlidePlan, FinalSlide, ImageGenerationRequest # Pydantic models
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-PROMPT_TEMPLATE = """
-You are an expert presentation designer's assistant. Your primary goal is to select the best possible slide layout for a given piece of content and structure the output as a JSON object.
+# Initialize OpenAI client
+load_dotenv()
+# Ensure API key is loaded before initializing client
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+if not OPENROUTER_API_KEY:
+    logging.critical("OPENROUTER_API_KEY not found in environment. LLM calls will fail.")
+    # You might want to raise an exception here or handle it gracefully
+    # For now, proceeding will likely cause errors later if client is used without key.
+client = OpenAI( # Renamed from base_openai_client
+    base_url=os.getenv("OPENROUTER_API_URL", "https://openrouter.ai/api/v1"),
+    api_key=OPENROUTER_API_KEY
+)
+# TODO: Integrate pydantic-ai with the client if necessary, or use pydantic-ai specific functions for LLM calls.
+LLM_MODEL_NAME = os.getenv("OPENROUTER_MODEL_NAME", "gpt-4-turbo") # Default to a capable model
 
-**OUTPUT JSON STRUCTURE:**
-The output MUST be a single JSON object with a root key "slides".
-"slides" is a JSON array of slide objects.
-Each slide object MUST have two keys:
-1.  `"layout"`: (string) The name of the layout to use for this slide, chosen from the AVAILABLE LAYOUTS JSON.
-2.  `"placeholders"`: (JSON object) A map where keys are placeholder names (strings from the chosen layout's "placeholders" object in AVAILABLE LAYOUTS JSON) and values are the content for those placeholders.
-
-**LAYOUT SELECTION RULES:**
-1.  Analyze the user's MARKDOWN CONTENT for a given slide (e.g., is it a title? A paragraph? A list of bullets? An image `![alt text](image.path)`)?
-2.  Review the `AVAILABLE_LAYOUTS_JSON`. This file describes each layout, including the `type` (e.g., "TITLE", "BODY", "PICTURE") and percentage-based `left_pct`, `top_pct`, `width_pct`, `height_pct` of its placeholders.
-3.  **Make a smart design choice.**
-    - If the content is a long list of bullet points, prefer a layout with a large "BODY" or "OBJECT" type placeholder (check `height_pct` and `width_pct`).
-    - If the content includes an image (e.g., `![alt text for image](image.png)`), choose a layout with a "PICTURE" placeholder. Consider the `alt text` as the content for this "PICTURE" placeholder. The actual image embedding is handled later.
-    - Ensure the chosen layout can accommodate all distinct pieces of content for the slide. For example, if there's a title, body text, and an image, select a layout that has placeholders suitable for all three.
-    - Do not choose a "Two Content" or similar layout (e.g., one with two "OBJECT" or "BODY" placeholders side-by-side) if the markdown content for a slide segment is clearly a single block of text and a single image. Instead, find a layout designed for one text block and one picture.
-4.  Based on your choice, generate a JSON object for the slide, mapping the content to the correct placeholder names from the chosen layout in `AVAILABLE_LAYOUTS_JSON`.
-
-**CONTENT FORMATTING RULES FOR PLACEHOLDER VALUES:**
-1.  **For Bullet Points or Paragraphs:** If the content for a placeholder is a list of items or a paragraph, format its value as a JSON ARRAY of strings. Each string in the array should be a single bullet point or a concise sentence from the paragraph.
-    - Example within "placeholders" map: `"Body Placeholder 1": ["First bullet point.", "Second bullet point."]`
-    - Example for paragraph: `"Text Placeholder 2": ["This is the first sentence.", "This is the second sentence."]`
-2.  **For Titles or Simple Text (including image alt text for PICTURE placeholders):** If the content is a title, a short phrase, or alt text for an image, format its value as a single JSON string.
-    - Example within "placeholders" map: `"Title 1": "This is a Title"`
-    - Example for image alt text: `"Picture Placeholder 1": "A majestic mountain range at sunset"`
-3.  **Cleanup:** Ensure all text in the final JSON is clean plain text. REMOVE all markdown formatting like '-', '*', '#', or '**'.
-
----
-**AVAILABLE LAYOUTS JSON (describes layout names, and for each layout, its placeholders with their types and dimensions):**
-{layouts_json}
-
----
-**MARKDOWN CONTENT (segment this into slides and map to layouts/placeholders based on the rules above):**
-{markdown_content}
----
-
-**YOUR TASK:**
-Generate a single, valid JSON object adhering to the **OUTPUT JSON STRUCTURE**, **LAYOUT SELECTION RULES**, and **CONTENT FORMATTING RULES** above.
-"""
-
-# Fallback parser for when LLM fails or is unavailable
-def fallback_parser(markdown_content, layouts_data):
+# --- Helper Functions ---
+def generate_and_save_image(prompt: str, save_path: str, model_name: str, sd_forge_url: str | None) -> bool:
     """
-    Simple fallback: splits markdown into slides by '---' and uses a dynamically chosen layout.
+    Generates an image using SD Forge and saves it.
+    Returns True on success, False on failure.
     """
-    slides = []
-    
-    # Determine a suitable fallback layout and its placeholders
-    fallback_layout_name = "Title Slide" # Default default
-    title_ph_name = "Title 1" # Default default
-    content_ph_name = "Subtitle 2" # Default default
+    if not sd_forge_url:
+        logging.error("SD_FORGE_SERVER_URL is not configured for image generation.")
+        return False
 
-    available_layouts = layouts_data.get("layouts", [])
-    
-    if available_layouts:
-        # The structure of l.get("placeholders", {}) is now a dictionary:
-        # {"PlaceholderName1": {"type": "TITLE", ...}, "PlaceholderName2": {"type": "BODY", ...}}
-        # So, len(l.get("placeholders", {})) or len(l.get("placeholders", {}).keys()) gives the count.
+    api_endpoint = f"{sd_forge_url.rstrip('/')}/sdapi/v1/txt2img"
+    # Standard payload, can be customized further if needed
+    payload = {
+        "prompt": prompt,
+        "steps": 25,
+        "width": 1024,
+        "height": 768,
+        "cfg_scale": 7,
+        "sampler_name": "Euler a", # A common sampler
+        "override_settings": {
+            "sd_model_checkpoint": model_name 
+        }
+    }
+    logging.info(f"Requesting image generation for prompt: '{prompt}' (Model: '{model_name}') -> Save path: '{save_path}'")
+    try:
+        response = requests.post(api_endpoint, json=payload, timeout=180) # 3 min timeout
+        response.raise_for_status()  # Raises HTTPError for bad responses (4XX or 5XX)
+        r_json = response.json()
 
-        # Try to find a 'Title and Content' like layout
-        preferred_layouts = [
-            l for l in available_layouts
-            if "title" in l["name"].lower() and "content" in l["name"].lower() and len(l.get("placeholders", {}).keys()) >= 2
-        ]
-        if not preferred_layouts: # Try single column general layouts
-            preferred_layouts = [
-                l for l in available_layouts
-                if "general" in l["name"].lower() and "single column" in l["name"].lower() and len(l.get("placeholders", {}).keys()) >= 2
-            ]
-        if not preferred_layouts: # Try any layout with at least 2 placeholders
-            preferred_layouts = [l for l in available_layouts if len(l.get("placeholders", {}).keys()) >= 2]
-        
-        if preferred_layouts:
-            chosen_layout = preferred_layouts[0] # Take the first suitable one
-            fallback_layout_name = chosen_layout["name"]
-            # Get placeholder names from the keys of the placeholders dictionary
-            placeholder_names = list(chosen_layout.get("placeholders", {}).keys())
-            if placeholder_names:
-                title_ph_name = placeholder_names[0]
-            if len(placeholder_names) > 1:
-                content_ph_name = placeholder_names[1]
-            else: # Only one placeholder, use it for title, content will be appended or ignored
-                content_ph_name = None
-        else: # Still no good layout, take the first one with at least one placeholder
-            first_layout_with_ph = next((l for l in available_layouts if l.get("placeholders", {})), None)
-            if first_layout_with_ph:
-                fallback_layout_name = first_layout_with_ph["name"]
-                placeholder_names = list(first_layout_with_ph.get("placeholders", {}).keys())
-                if placeholder_names:
-                    title_ph_name = placeholder_names[0]
-                content_ph_name = None # No second placeholder for sure if we are in this block
-            else: # Absolute fallback: use a generic name, generator might skip
-                logging.warning("No suitable fallback layout with placeholders found in layouts_data. Using generic names.")
-                fallback_layout_name = "Fallback Layout" 
-                title_ph_name = "Title Placeholder"
-                content_ph_name = "Content Placeholder"
-
-    logging.info(f"Fallback parser using layout: '{fallback_layout_name}' with title placeholder: '{title_ph_name}' and content placeholder: '{content_ph_name or 'N/A'}'")
-
-    for slide_md in markdown_content.split('---'):
-        slide_md = slide_md.strip()
-        if not slide_md:
-            continue
-        lines = slide_md.splitlines()
-        title = lines[0].strip('# ').strip() if lines else "Untitled Slide"
-        body_lines = [line.strip() for line in lines[1:] if line.strip()]
-        
-        # Ensure body is an array of strings, even if empty or single line
-        if not body_lines:
-            body = ["This is sample body text generated to ensure the slide is not empty. Add your own content here."]
+        if r_json.get('images') and r_json['images'][0]:
+            import base64
+            image_data_base64 = r_json['images'][0]
+            # Some APIs might include data:image/png;base64, prefix
+            if "," in image_data_base64:
+                image_data_base64 = image_data_base64.split(',', 1)[1]
+            
+            image_bytes = base64.b64decode(image_data_base64)
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            with open(save_path, 'wb') as f:
+                f.write(image_bytes)
+            logging.info(f"Image successfully generated and saved to {save_path}")
+            return True
         else:
-            body = [clean_text_for_presentation(b_line) for b_line in body_lines]
+            logging.error(f"Image generation failed: No image data in response. Response: {r_json}")
+            return False
+    except requests.exceptions.Timeout:
+        logging.error(f"Image generation timed out for prompt: '{prompt}'")
+        return False
+    except requests.exceptions.RequestException as e:
+        logging.error(f"API Error during image generation ({api_endpoint}): {e}")
+        if e.response is not None:
+            logging.error(f"API Response: {e.response.status_code} - {e.response.text}")
+        return False
+    except Exception as e:
+        logging.error(f"An unexpected error occurred during image generation: {e}")
+        return False
 
-        cleaned_title = clean_text_for_presentation(title)
-        
-        slide_content = {title_ph_name: cleaned_title}
-        if content_ph_name:
-            slide_content[content_ph_name] = body if body else [""] # Ensure body is always a list
-        elif body: # No dedicated content placeholder, append to title if title_ph exists
-             slide_content[title_ph_name] = f"{cleaned_title}\n{'\n'.join(body)}"
-
-
-        slides.append({
-            "layout": fallback_layout_name,
-            "placeholders": slide_content
-        })
-    return {"slides": slides}
-
-def extract_json_from_response(response_content):
+# --- New Agentic LLM Caller Functions ---
+def call_planning_llm(markdown_chunk: str, layouts_json_str: str) -> SlidePlan | None:
     """
-    Extracts the first JSON object from a string, even if wrapped in Markdown code fences or with extra text.
+    Calls the LLM to generate a high-level plan for a slide.
+    Returns a SlidePlan object or None if an error occurs.
     """
-    code_block = re.search(r"```(?:json)?\s*({.*?})\s*```", response_content, re.DOTALL)
-    if code_block:
-        json_str = code_block.group(1)
-    else:
-        json_match = re.search(r"({.*})", response_content, re.DOTALL)
-        if json_match:
-            json_str = json_match.group(1)
-        else:
-            json_str = response_content
-    return json_str
-
-def call_llm(system_prompt, user_prompt): # model_name parameter removed
-    """
-    Calls the LLM (OpenRouter) to process the content.
-    The model name is now sourced from the OPENROUTER_MODEL_NAME environment variable.
-    """
-    openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
-    if not openrouter_api_key:
-        logging.error("OPENROUTER_API_KEY not found in environment variables.")
+    if not OPENROUTER_API_KEY: # Check again in case it wasn't set at module load
+        logging.error("OPENROUTER_API_KEY not available for call_planning_llm.")
         return None
 
-    client = OpenAI(
-        base_url="https://openrouter.ai/api/v1",
-        api_key=openrouter_api_key,
-    )
-    
-    default_model = "deepseek/deepseek-chat-v3-0324:free"
-    chosen_model = os.getenv("OPENROUTER_MODEL_NAME", default_model)
-    logging.info(f"Using OpenRouter API with model: {chosen_model}")
+    system_prompt = """
+You are an AI assistant tasked with planning a single presentation slide based on a chunk of markdown content.
+Your goal is to create a high-level plan for the slide, including its topic, the type of content,
+the raw text content (cleaned and broken into sentences or bullets), and an optional request for image generation if it would significantly enhance the slide.
 
+Output Format:
+You MUST respond with a JSON object that strictly adheres to the `SlidePlan` Pydantic model.
+The `raw_content` should be a list of strings (sentences or bullet points). Clean out markdown formatting (like #, *, -) from this text.
+If you decide an image is needed, provide a detailed `prompt` for an image generation model within the `image_request` object.
+Do not request an image if the markdown already implies an image (e.g., `![alt](path)` - though this specific markdown is not directly processed by you for image paths, consider its intent).
+Choose `content_type` from: 'paragraph', 'bullet_list', 'title_only', 'image_with_caption'.
+"""
+    user_prompt = f"""
+Available Layouts Information (for context, you don't choose the final layout here):
+```json
+{layouts_json_str}
+```
+
+Markdown Content Chunk for this Slide:
+---
+{markdown_chunk}
+---
+
+Based on the markdown chunk, generate a `SlidePlan` JSON object.
+Focus on:
+1.  `slide_topic`: A concise topic for this slide.
+2.  `content_type`: The primary nature of the content.
+3.  `raw_content`: The essential text, cleaned and listified. Ensure markdown syntax (like '#', '*', '-') is removed from the text.
+4.  `image_request` (optional): If a new image would be highly beneficial, define `ImageGenerationRequest` with a `prompt`.
+"""
+    logging.info(f"Calling Planning LLM for markdown chunk:\n{markdown_chunk[:200]}...")
     try:
-        completion = client.chat.completions.create(
-            model=chosen_model,
+        response = client.chat.completions.create(
+            model=LLM_MODEL_NAME,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ]
         )
-        response_content = completion.choices[0].message.content
-        json_str = extract_json_from_response(response_content)
-        return json.loads(json_str)
-    except json.JSONDecodeError as e:
-        logging.error(f"LLM output was not valid JSON: {e}")
-        logging.error(f"LLM Raw Response: {response_content}")
-        return None
-    except Exception as e:
-        logging.error(f"Error calling OpenRouter LLM: {e}")
+        
+        # Extract the JSON from the response
+        try:
+            content = response.choices[0].message.content
+            # Log the actual response for debugging
+            logging.info(f"LLM Response: {content}")
+            # Strip JSON code block markers if present
+            if content.startswith("```json\n") and content.endswith("\n```"):
+                content = content[8:-4]  # Remove ```json\n and \n```
+            plan_data = json.loads(content)
+            plan = SlidePlan(**plan_data)
+            if plan.raw_content:
+                plan.raw_content = [clean_text_for_presentation(text) for text in plan.raw_content]
+            logging.info(f"Planning LLM successful. Slide topic: {plan.slide_topic}")
+            return plan
+        except json.JSONDecodeError as e:
+            logging.error(f"Failed to parse LLM response as JSON: {e}")
+            return None
+        except Exception as e:
+            logging.error(f"Failed to create SlidePlan from LLM response: {e}")
+            return None
+    except Exception as e: # This will now catch the NotImplementedError or any other unexpected error
+        logging.error(f"Error in call_planning_llm: {e}")
         return None
 
-def process_content(markdown_filepath, layouts_filepath, output_filepath, api_key_unused=None): # model_name parameter removed
+def call_designer_llm(slide_plan: SlidePlan, image_path: str | None, layouts_json_str: str) -> FinalSlide | None:
     """
-    Processes markdown content to produce a structured presentation plan,
-    and now reliably handles and cleans malformed list-as-string responses from the LLM.
+    Calls the LLM to generate the final JSON structure for a slide,
+    including layout selection and placeholder mapping.
+    Returns a FinalSlide object or None if an error occurs.
     """
-    load_dotenv()
-    presentation_structure = None
+    if not OPENROUTER_API_KEY:
+        logging.error("OPENROUTER_API_KEY not available for call_designer_llm.")
+        return None
 
-    # Read markdown content
+    system_prompt = """
+You are an AI presentation designer. Your task is to take a high-level slide plan (including content and an optional image path)
+and select the best PowerPoint layout from the provided list. Then, map all content (text and the image if provided)
+to the appropriate placeholders in the chosen layout.
+
+Output Format:
+You MUST respond with a JSON object that strictly adheres to the `FinalSlide` Pydantic model.
+The `layout` field must be one of the layout names from the "Available Layouts JSON".
+The `placeholders` field must be a dictionary where keys are placeholder names from the chosen layout,
+and values are the content (string, list of strings for bullets, or the provided image path for an image placeholder).
+
+Ensure all text content is clean and ready for presentation (no markdown).
+If an `image_path` is provided, you MUST include it in a suitable "Picture" or "Image" type placeholder in your chosen layout.
+If the `slide_plan.content_type` is 'image_with_caption' and an image_path is provided, ensure the image and some caption/text from `slide_plan.raw_content` are placed.
+If `slide_plan.content_type` is 'title_only', the `raw_content` might be empty or just a title; ensure the title placeholder is filled.
+If `slide_plan.raw_content` is a list of one item, it's likely a title or single paragraph. If multiple items, it's a list.
+"""
+
+    user_prompt = f"""
+Slide Plan:
+```json
+{slide_plan.model_dump_json(indent=2)}
+```
+
+Generated Image Path (if any, otherwise None):
+{image_path if image_path else "No image was generated for this slide."}
+
+Available Layouts JSON (Choose one and map content to its placeholders):
+```json
+{layouts_json_str}
+```
+
+Based on the Slide Plan, the optional image path, and the Available Layouts, generate a `FinalSlide` JSON object.
+Select the most appropriate layout.
+Map all `slide_plan.raw_content` and the `image_path` (if provided and applicable for the chosen layout) to the placeholders of your chosen layout.
+If `image_path` is provided, ensure it's assigned to a placeholder designed for images (e.g., name containing "Picture", "Image", "Photo").
+The `slide_plan.slide_topic` should generally go into a "Title" placeholder.
+The `slide_plan.raw_content` should go into "Content", "Body", or similar text placeholders.
+"""
+    logging.info(f"Calling Designer LLM for slide topic: {slide_plan.slide_topic}")
+    try:
+        response = client.chat.completions.create(
+            model=LLM_MODEL_NAME,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ]
+        )
+        
+        # Extract the JSON from the response
+        try:
+            content = response.choices[0].message.content
+            # Log the actual response for debugging
+            logging.info(f"LLM Response: {content}")
+            # Strip JSON code block markers if present
+            if content.startswith("```json\n") and content.endswith("\n```"):
+                content = content[8:-4]  # Remove ```json\n and \n```
+            slide_data = json.loads(content)
+            final_slide = FinalSlide(**slide_data)
+            logging.info(f"Designer LLM successful. Chosen layout: {final_slide.layout}")
+            return final_slide
+        except json.JSONDecodeError as e:
+            logging.error(f"Failed to parse LLM response as JSON: {e}")
+            return None
+        except Exception as e:
+            logging.error(f"Failed to create FinalSlide from LLM response: {e}")
+            return None
+    except Exception as e: # This will now catch the NotImplementedError or any other unexpected error
+        logging.error(f"Error in call_designer_llm: {e}")
+        return None
+
+# --- Main Processing Function (Agentic Workflow) ---
+def process_content(markdown_filepath: str, layouts_filepath: str, output_filepath: str, regenerate_images: bool = False):
+    """
+    Processes markdown content using an agentic workflow to generate a presentation.json file.
+    """
+    # load_dotenv() is called at module level, but good to ensure critical vars are checked
+    if not OPENROUTER_API_KEY:
+        logging.critical("process_content cannot proceed: OPENROUTER_API_KEY is not set.")
+        return
+
+    sd_forge_url = os.getenv("SD_FORGE_SERVER_URL")
+    flux_model_name = os.getenv("FLUX_MODEL_NAME", "stabilityai/stable-diffusion-3-medium") 
+
     try:
         with open(markdown_filepath, 'r', encoding='utf-8') as f:
             markdown_content = f.read()
+    except FileNotFoundError:
+        logging.error(f"Markdown file not found: {markdown_filepath}")
+        return
     except Exception as e:
         logging.error(f"Error reading markdown file '{markdown_filepath}': {e}")
         return
 
-    # Read layouts.json
     try:
         with open(layouts_filepath, 'r', encoding='utf-8') as f:
-            layouts_content = f.read()
-            # Parse layouts_content to be available for fallback_parser
-            layouts_data = json.loads(layouts_content) 
+            layouts_json_str = f.read() 
+            # layouts_data = json.loads(layouts_json_str) # Not strictly needed if only passing string to LLM
+    except FileNotFoundError:
+        logging.error(f"Layouts file not found: {layouts_filepath}")
+        return
     except Exception as e:
-        logging.error(f"Error reading or parsing layouts file '{layouts_filepath}': {e}")
-        # Fallback: if layouts.json is missing, unreadable, or invalid JSON
-        logging.warning(f"Layouts file '{layouts_filepath}' not found, unreadable, or invalid. Proceeding with empty layouts_data for fallback.")
-        layouts_content = "{}" # For LLM prompt
-        layouts_data = {"layouts": []} # For fallback_parser
+        logging.error(f"Error reading/parsing layouts file '{layouts_filepath}': {e}")
+        return
 
-    # Build prompts
-    system_prompt = (
-        "You are an AI assistant. Please follow the user's instructions carefully to generate the requested JSON output."
-    )
-    user_prompt = PROMPT_TEMPLATE.format(
-        layouts_json=layouts_content, 
-        markdown_content=markdown_content
-    )
+    final_presentation = {"slides": []}
+    markdown_chunks = markdown_content.split('---')
+    project_dir = os.path.dirname(os.path.abspath(markdown_filepath)) # Use abspath for robustness
+    images_output_dir = os.path.join(project_dir, "images") 
 
-    llm_response = call_llm(system_prompt, user_prompt) # model_name argument removed
+    for i, chunk in enumerate(markdown_chunks):
+        chunk = chunk.strip()
+        if not chunk:
+            continue
 
-    if llm_response:
-        # Ensure the "placeholders" key is used, not "content"
-        for slide in llm_response.get("slides", []):
-            if "content" in slide and "placeholders" not in slide:
-                slide["placeholders"] = slide.pop("content")
+        logging.info(f"--- Starting Agentic Process for Slide {i+1} ---")
 
-        if "slides" not in llm_response or not isinstance(llm_response["slides"], list):
-            logging.warning("LLM response is missing 'slides' key or is not a list. Using fallback.")
-            presentation_structure = fallback_parser(markdown_content, layouts_data)
-        else:
-            # --- START OF DEFINITIVE FIX (incorporating ast.literal_eval) ---
-            logging.info("Sanitizing and cleaning LLM response...")
-            for slide in llm_response["slides"]: # Iterate over llm_response["slides"]
-                # Ensure the "placeholders" key is used, not "content"
-                if "content" in slide and "placeholders" not in slide:
-                    slide["placeholders"] = slide.pop("content")
-
-                if "placeholders" in slide and isinstance(slide["placeholders"], dict): # Check "placeholders"
-                    for key, value in list(slide["placeholders"].items()): # Iterate over a copy
-                        
-                        # STEP 1: Fix stringified lists from the LLM.
-                        if isinstance(value, str) and value.strip().startswith('[') and value.strip().endswith(']'):
-                            try:
-                                # Use ast.literal_eval for safety. It only parses simple Python literals.
-                                parsed_value = ast.literal_eval(value)
-                                if isinstance(parsed_value, list):
-                                    value = parsed_value # The string is now a proper list
-                            except (ValueError, SyntaxError) as e_ast:
-                                # If it's not a valid list literal, leave it as a string for the next step.
-                                logging.warning(f"Found string '{value}' that looks like a list, but could not parse with ast.literal_eval: {e_ast}. Will attempt to clean as string.")
-                        
-                        # STEP 2: Clean the final values (which are now correctly typed or original string).
-                        if isinstance(value, str):
-                            slide["placeholders"][key] = clean_text_for_presentation(value)
-                        elif isinstance(value, list):
-                            # Clean each string item within the list, keep non-strings as is
-                            slide["placeholders"][key] = [clean_text_for_presentation(item) if isinstance(item, str) else item for item in value]
+        # 1. Planning Agent
+        logging.info(f"  Step 1 (Slide {i+1}): Analyzing content and creating a high-level plan...")
+        slide_plan: SlidePlan | None = call_planning_llm(chunk, layouts_json_str)
+        
+        if not slide_plan:
+            logging.warning(f"  [Failed] Could not create a plan for slide {i+1}. Skipping.")
+            continue
             
-            # --- Post-cleanup: Handle empty placeholders ---
-            for slide in llm_response["slides"]: # Iterate over llm_response["slides"]
-                current_placeholders = slide.get("placeholders", {}) # Check "placeholders"
-                # Removed content_ph_name from this list as it's not defined in this scope
-                for placeholder_key in ["Content Placeholder 2", "Content Placeholder 6", "Content Placeholder 7"]: 
-                    if placeholder_key and placeholder_key in current_placeholders: # Check if placeholder_key is not None
-                        content_value = current_placeholders[placeholder_key]
-                        is_empty = False
-                        if isinstance(content_value, str):
-                            if not content_value or not content_value.strip():
-                                is_empty = True
-                        elif isinstance(content_value, list):
-                            if not content_value: 
-                                is_empty = True
-                            else: 
-                                is_empty = all(not item or (isinstance(item, str) and not item.strip()) for item in content_value)
-                        
-                        if is_empty:
-                            current_placeholders[placeholder_key] = "This is sample body text generated to ensure the slide is not empty. Add your own content here."
-            presentation_structure = llm_response
-            # --- END OF DEFINITIVE FIX ---
-    else:
-        logging.warning("LLM processing failed or no response. Using fallback parser.")
-        presentation_structure = fallback_parser(markdown_content, layouts_data)
-    
-    if presentation_structure:
+        image_path_for_slide = None
+        # 2. Tool Use: Image Generation (if requested)
+        if slide_plan.image_request and slide_plan.image_request.prompt:
+            img_prompt = slide_plan.image_request.prompt
+            logging.info(f"  Step 2 (Slide {i+1}): Plan requires image generation. Prompt: '{img_prompt}'")
+            
+            if not sd_forge_url:
+                logging.warning(f"  SD_FORGE_SERVER_URL not configured. Cannot generate image for slide {i+1}.")
+            else:
+                safe_topic = re.sub(r'[^a-zA-Z0-9_.-]', '_', slide_plan.slide_topic.lower())[:50]
+                img_filename = f"slide_{i+1}_{safe_topic}.png" 
+                abs_image_save_path = os.path.join(images_output_dir, img_filename)
+                image_path_for_json = os.path.join("images", img_filename) # Relative path for presentation.json
+
+                should_generate_this_image = regenerate_images or not os.path.exists(abs_image_save_path)
+
+                if should_generate_this_image:
+                    logging.info(f"  Generating image for slide {i+1} at {abs_image_save_path}")
+                    success = generate_and_save_image(img_prompt, abs_image_save_path, flux_model_name, sd_forge_url)
+                    if success:
+                        image_path_for_slide = image_path_for_json
+                        logging.info(f"  Image generated successfully: {image_path_for_slide}")
+                    else:
+                        logging.warning(f"  Failed to generate image for slide {i+1}.")
+                else:
+                    logging.info(f"  Image for slide {i+1} already exists and regenerate_images is False. Using existing: {abs_image_save_path}")
+                    image_path_for_slide = image_path_for_json
+        
+        # 3. Designer Agent
+        logging.info(f"  Step 3 (Slide {i+1}): Generating final layout and placeholder mapping...")
+        final_slide: FinalSlide | None = call_designer_llm(
+            slide_plan, 
+            image_path_for_slide, 
+            layouts_json_str
+        )
+        
+        if not final_slide:
+            logging.warning(f"  [Failed] Could not generate final slide structure for slide {i+1}. Skipping.")
+            continue
+            
+        final_presentation["slides"].append(final_slide.model_dump(exclude_none=True)) # exclude_none for cleaner JSON
+        logging.info(f"--- Successfully processed slide {i+1} ---")
+
+    if final_presentation["slides"]:
         try:
+            os.makedirs(os.path.dirname(output_filepath), exist_ok=True)
             with open(output_filepath, 'w', encoding='utf-8') as f:
-                json.dump(presentation_structure, f, indent=2, ensure_ascii=False)
-            logging.info(f"Clean presentation plan saved successfully to {output_filepath}")
+                json.dump(final_presentation, f, indent=2, ensure_ascii=False)
+            logging.info(f"Presentation structure successfully saved to {output_filepath}")
         except Exception as e:
-            logging.error(f"Error saving presentation plan to '{output_filepath}': {e}")
+            logging.error(f"Error saving presentation structure to '{output_filepath}': {e}")
     else:
-        logging.error(f"Failed to generate or fallback to a presentation structure. Output file '{output_filepath}' not created.")
+        logging.warning(f"No slides were processed. Output file '{output_filepath}' will be empty or not created.")
+
+if __name__ == '__main__':
+    logging.info("Running processor.py directly for testing (conceptual).")
+    
+    # Create dummy files for testing
+    # Ensure this script is in the pptx_generator directory for relative paths to work,
+    # or adjust paths accordingly.
+    test_project_dir = "test_project_processor"
+    os.makedirs(test_project_dir, exist_ok=True)
+    os.makedirs(os.path.join(test_project_dir, "images"), exist_ok=True)
+
+    dummy_md_path = os.path.join(test_project_dir, "content.md")
+    dummy_layouts_path = os.path.join(test_project_dir, "layouts.json")
+    dummy_output_path = os.path.join(test_project_dir, "presentation.json")
+
+    with open(dummy_md_path, "w", encoding='utf-8') as f:
+        f.write("## Slide 1: Introduction\n\nWelcome to this amazing presentation about AI.\n\n* Bullet point 1\n* Bullet point 2\n\n---\n\n## Slide 2: The Future\n\nThis slide discusses the future of AI and could really use an image of a futuristic robot.\n\n---\n\n## Slide 3: Conclusion\n\nAI is transformative.")
+    
+    dummy_layout_data = {
+        "source_template_path": "dummy_template.pptx", # Added as per layouts.json structure
+        "layouts": [
+            {"name": "Title Slide", "placeholders": ["Title 1", "Subtitle 2"]},
+            {"name": "Title and Content", "placeholders": ["Title 1", "Content Placeholder 1"]},
+            {"name": "Image with Caption", "placeholders": ["Title 1", "Picture Placeholder 1", "Caption Placeholder 1"]},
+            {"name": "Blank", "placeholders": []}
+        ]
+    }
+    with open(dummy_layouts_path, "w", encoding='utf-8') as f:
+        json.dump(dummy_layout_data, f, indent=2)
+
+    if not OPENROUTER_API_KEY:
+        logging.error("CRITICAL: OPENROUTER_API_KEY not set for test run. LLM calls will fail.")
+    
+    # Set SD_FORGE_SERVER_URL in .env or environment if you want to test image generation
+    # e.g. SD_FORGE_SERVER_URL=http://localhost:7860 
+    # And FLUX_MODEL_NAME, e.g. FLUX_MODEL_NAME=JuggernautXL_v9_RunDiffusionPhoto_v2.safetensors
+
+    process_content(dummy_md_path, dummy_layouts_path, dummy_output_path, regenerate_images=False)
+
+    logging.info(f"Test run finished. Check {dummy_output_path} and the {os.path.join(test_project_dir, 'images')} folder.")
+    # To clean up, you might manually delete the test_project_processor directory.

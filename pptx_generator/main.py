@@ -27,6 +27,10 @@ def main():
                                            help="Process markdown (projects/<project_name>/content.md) into a presentation plan (projects/<project_name>/output/presentation.json).")
     process_parser.add_argument("project_name", 
                                 help="Name of the project (e.g., 'robotics').")
+    process_parser.add_argument("--regenerate-images",
+                                action="store_true",
+                                default=False,
+                                help="Force regeneration of all images specified with 'gen:' in markdown, even if they already exist.")
 
     # --- 'generate' command ---
     generate_parser = subparsers.add_parser('generate', 
@@ -85,7 +89,12 @@ def main():
             return
         
         print(f"Processing '{markdown_path}' for project '{project_name}' -> '{presentation_output_path}'")
-        process_content(markdown_path, layouts_path, presentation_output_path)
+        process_content(
+            markdown_filepath=markdown_path, 
+            layouts_filepath=layouts_path, 
+            output_filepath=presentation_output_path,
+            regenerate_images=args.regenerate_images
+        )
 
     elif args.command == 'generate':
         presentation_plan_path = os.path.join(output_dir, 'presentation.json')

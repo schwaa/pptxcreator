@@ -1,7 +1,7 @@
 # Project Progress
 
 ## Current Focus
-Core text-based presentation generation functionality is stable. The focus is now on **refining image handling, enhancing overall robustness, and significantly expanding test coverage.**
+Core text-based presentation generation functionality is stable. The primary focus is now on **Architectural Refactoring of `processor.py` to an Agentic Workflow using Pydantic models and `pydantic-ai` (or relevant Pydantic AI modules).** This is a foundational change to improve reliability and enable more intelligent features.
 
 ## Completed Items
 1.  **Project Setup**
@@ -33,27 +33,31 @@ Core text-based presentation generation functionality is stable. The focus is no
 
 ## In Progress
 1.  **Memory Bank Update:**
-    *   ✅ All memory bank files updated to reflect current project state and learnings (as of this update).
-2.  **Image Handling Refinement:**
-    *   🔄 Actively defining strategy and planning implementation for robust image path specification and embedding.
-3.  **Testing Framework & Coverage:**
-    *   🔄 Expanding unit and integration tests.
+    *   ✅ All memory bank files being updated to reflect the planned agentic architecture (as of this update).
+2.  **Agentic Workflow Refactoring (`processor.py`):**
+    *   🔄 Planning and documenting the refactor of `processor.py` to an agentic workflow with Pydantic models (`SlidePlan`, `FinalSlide`) and `pydantic-ai`.
+    *   🔄 Defining new Pydantic models in `pptx_generator/models.py`.
 
 ## Pending Tasks (Major Next Steps)
 
-### Phase 1: Enhancements & Testing (Core functionality stable)
-1.  **Image Handling Implementation (Primary Focus)**
-    *   ⏳ Define how image paths are specified in `content.md` and represented in `presentation.json`.
-    *   ⏳ Update `processor.py` (LLM prompt and parsing) to correctly extract and structure image information.
-    *   ⏳ Enhance `generator.py` for robust image finding (relative to project, `images/` folder, absolute paths) and embedding.
-2.  **Testing Suite Expansion (High Priority)**
-    *   ⏳ Write comprehensive unit tests for `analyzer.py`, `processor.py`, `generator.py`.
-    *   ⏳ Develop integration tests for the full `analyze` -> `process` -> `generate` workflow.
-    *   ⏳ Test with various templates and content types (including images once implemented).
-3.  **Error Handling & Robustness (Ongoing Refinement)**
-    *   ⏳ Review and improve error messages across all components for clarity and actionability.
-    *   ⏳ Strengthen validation for `layouts.json` and `presentation.json` if new edge cases are found.
-    *   ⏳ Improve fallback mechanisms where appropriate.
+### Phase 1: Agentic Workflow Implementation (Current Primary Focus)
+1.  **Implement Agentic `processor.py`:**
+    *   ⏳ Create `pptx_generator/models.py` with `ImageGenerationRequest`, `SlidePlan`, `FinalSlide` Pydantic models.
+    *   ⏳ Implement `call_planning_llm` in `processor.py` using `pydantic-ai` to return `SlidePlan`.
+    *   ⏳ Implement `call_designer_llm` in `processor.py` using `pydantic-ai` to return `FinalSlide`.
+    *   ⏳ Refactor `process_content` loop in `processor.py` to use the new agentic, two-pass LLM calls.
+    *   ⏳ Update `presentation.json` generation to use `FinalSlide.model_dump()`.
+    *   ⏳ Add `pydantic` and `pydantic-ai` to `requirements.txt`.
+2.  **Testing Suite Expansion (Post-Agentic Refactor):**
+    *   ⏳ Write unit tests for `pptx_generator/models.py`.
+    *   ⏳ Write unit tests for `call_planning_llm` and `call_designer_llm` (mocking LLM calls).
+    *   ⏳ Update/create integration tests for the `process` command to validate the new workflow.
+3.  **Image Handling Refinement (Post-Agentic Refactor):**
+    *   ⏳ Leverage `ImageGenerationRequest` from `SlidePlan` and image path in `FinalSlide`.
+    *   ⏳ Enhance `generator.py` for robust image file location and embedding based on paths from `presentation.json`.
+4.  **Error Handling & Robustness (Ongoing Refinement):**
+    *   ⏳ Integrate Pydantic validation errors into user feedback.
+    *   ⏳ Review and improve error messages related to the new agentic flow.
 
 ### Documentation
 1.  **User Guide Updates**
@@ -74,13 +78,21 @@ Core text-based presentation generation functionality is stable. The focus is no
 - ✅ LLM integration for content structuring and layout mapping is operational.
 - ✅ Data flow between components and JSON contracts (`layouts.json`, `presentation.json`) are stable.
 
-### v0.3.0 - Robust Image Handling & Comprehensive Testing (Current Target)
-- 🎯 Implement robust image path specification, processing, and embedding.
-- 🎯 Significantly increase unit and integration test coverage.
-- 🎯 Continue refining error handling and user experience.
-- Target: Next 1-2 weeks.
+### v0.3.0 - Agentic `processor.py` & Foundational Pydantic Models (Current Target)
+- 🎯 Refactor `processor.py` to use an agentic workflow with `call_planning_llm` and `call_designer_llm`.
+- 🎯 Implement `SlidePlan`, `FinalSlide`, and `ImageGenerationRequest` Pydantic models in `models.py`.
+- 🎯 Integrate `pydantic-ai` for Pydantic-validated LLM responses.
+- 🎯 Update `presentation.json` to use `FinalSlide.model_dump()`.
+- 🎯 Add initial unit tests for new models and agentic functions.
+- Target: Next 1 week.
 
-### v0.4.0 - Advanced Features & Documentation
+### v0.4.0 - Robust Image Handling & Comprehensive Testing
+- 🎯 Implement robust image path specification, processing, and embedding, leveraging the agentic framework.
+- 🎯 Significantly increase unit and integration test coverage for all components.
+- 🎯 Continue refining error handling and user experience.
+- Target: Following 1-2 weeks.
+
+### v0.5.0 - Advanced Features & Documentation
 - Explore support for other placeholder types (e.g., charts from data).
 - Complete user and developer documentation.
 - Target: Following 2 weeks.

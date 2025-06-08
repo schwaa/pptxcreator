@@ -2,10 +2,12 @@
 
 ## Code Structure and Organization
 - Adhere strictly to the project structure defined in the instructions.
-- Prioritize modularity: Separate core logic (`analyzer.py`, `processor.py`, `generator.py`) from utilities (`utils.py`) and the CLI (`main.py`).
+- Prioritize modularity: Separate core logic (`analyzer.py`, `processor.py`, `generator.py`) from Pydantic models (`models.py`), utilities (`utils.py`), and the CLI (`main.py`).
+- Pydantic models for data validation and LLM interaction are defined in `pptx_generator/models.py`.
 - When creating new files, ensure correct directory placement.
 
 ## Coding Standards
+- Utilize the `pydantic-ai` library (or relevant modules from the Pydantic AI ecosystem) to ensure LLM outputs conform to predefined Pydantic models, enhancing reliability.
 - Implement robust error handling for file operations (reading data, loading templates, saving output).
 - Provide clear, actionable error messages.
 - Ensure all Python code follows PEP 8 style guidelines.
@@ -40,7 +42,8 @@
         - Each object has `"layout"`: (string) name of the layout to use.
         - Each object has `"placeholders"`: (dictionary)
             - Keys are placeholder names (string).
-            - Values are content (string for single text, array of strings for bullet points/paragraphs, or string description for images).
+            - Values are content (string for single text, array of strings for bullet points/paragraphs, or string path for images if `FinalSlide` includes an image).
+    - Each slide object in the `slides` array is a `FinalSlide.model_dump()`.
 
 ## Pytest Testing Conventions
 - **File Naming:** Test files should be named `test_*.py` or `*_test.py` and located in the `tests/` directory.
@@ -55,12 +58,22 @@
 - **Running Tests:** From project root: `pytest`.
 
 ## Key Script Logic Points
-- **`processor.py` (`process_content`):**
-    - Reads `content.md` and `layouts.json`.
-    - Passes markdown and layout definitions (not the `source_template_path`) to LLM.
-    - Expects LLM to return JSON matching `presentation.json` structure (using `"placeholders"` key for content map).
-    - Handles stringified lists from LLM using `ast.literal_eval`.
-    - `fallback_parser` uses a known valid layout name (e.g., "Title, Content 1" for `default_template.pptx`).
+- **`processor.py` (`process_content` - Agentic Workflow):**
+    - Iterates through markdown chunks from `content.md`.
+    - **Input per chunk:** Markdown text, `layouts_json` (for layout definitions).
+    - **Step 1: Planning (`call_planning_llm`)**
+        - Uses `pydantic-ai` (or relevant Pydantic AI modules) to call LLM, expecting a `SlidePlan` Pydantic model.
+        - `SlidePlan` contains `slide_topic`, `content_type`, `raw_content`, and optional `image_request` (an `ImageGenerationRequest` Pydantic model with an image prompt).
+    - **Step 2: Tool Use (Image Generation - Optional)**
+        - If `SlidePlan.image_request` exists, `generate_and_save_image` is called.
+        - Returns `image_path`.
+    - **Step 3: Designing (`call_designer_llm`)**
+        - Uses `pydantic-ai` (or relevant Pydantic AI modules) to call LLM with `SlidePlan`, optional `image_path`, and `layouts_json`.
+        - Expects a `FinalSlide` Pydantic model.
+        - `FinalSlide` contains `layout` (string) and `placeholders` (dict mapping placeholder names to content: text, list of text, or image path).
+    - **Output:** `FinalSlide.model_dump()` is appended to the `slides` list for `presentation.json`.
+- **`models.py`:**
+    - Defines Pydantic models: `ImageGenerationRequest`, `SlidePlan`, `FinalSlide`.
 - **`generator.py` (`generate_presentation`):**
     - Takes `presentation.json` path and `template_filepath` as direct arguments.
     - Iterates `presentation.json` slides.

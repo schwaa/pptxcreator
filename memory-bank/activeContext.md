@@ -1,20 +1,27 @@
 # Active Context
 
 ## Current Work Focus
-The core functionality of the three-component architecture (analyze, process, generate) is now stable and producing presentations with text content. The current focus is shifting to **Feature Enhancement (Image Handling) and Comprehensive Testing**.
+The core functionality of the three-component architecture (analyze, process, generate) is stable. The current focus is an **Architectural Refactoring: Implementing an Agentic Workflow for `processor.py`**. This change is foundational for improving system intelligence, reliability, and will provide a more robust framework for future enhancements like advanced image handling.
 
-### Current Implementation Phase: Enhancements and Testing
-- Robust image handling implementation.
-- Expansion of unit and integration test coverage.
-- Continued refinement of error handling and user feedback.
+### Current Implementation Phase: Agentic Refactoring
+- Define Pydantic models for structured LLM interaction (`SlidePlan`, `FinalSlide`, `ImageGenerationRequest`) in `pptx_generator/models.py`.
+- Refactor `processor.py` to use a two-pass LLM approach:
+    1. `call_planning_llm` to generate a `SlidePlan`.
+    2. `call_designer_llm` to generate a `FinalSlide` based on the plan and any generated assets (e.g., images).
+- Integrate `pydantic-ai` (or relevant Pydantic AI modules) to ensure LLM outputs conform to these Pydantic models.
+- Update `presentation.json` structure to reflect `FinalSlide.model_dump()`.
 
 ```mermaid
 graph TD
-    A[Current Focus] --> B[Feature Enhancement & Testing]
-    B --> C[Robust Image Handling]
-    B --> D[Expand Test Suite]
-    B --> E[Refine Error Handling/UX]
-    B --> F[Memory Bank Updated]
+    A[Current Focus] --> B[Architectural Refactoring: Agentic Workflow]
+    B --> C[Define Pydantic Models (models.py)]
+    B --> D[Refactor processor.py (Agentic Loop)]
+    D --> D1[call_planning_llm -> SlidePlan]
+    D --> D2[Optional Image Generation]
+    D --> D3[call_designer_llm -> FinalSlide]
+    B --> E[Integrate 'pydantic-ai']
+    B --> F[Update presentation.json Structure]
+    B --> G[Update Memory Bank (SystemPatterns, TechContext, etc.)]
 ```
 
 ## Component Architecture & Data Flow (Confirmed)
@@ -25,10 +32,16 @@ graph TD
 - **Command:** `python -m pptx_generator.main analyze <project_name> <template_path_or_name>`
 
 ### 2. Content Processing (`processor.py`)
-- **Input:** `projects/<project_name>/content.md`, `projects/<project_name>/output/layouts.json` (provides layout definitions to LLM).
-- **Output:** `projects/<project_name>/output/presentation.json` containing slide plans (layout name, `placeholders` dictionary mapping placeholder name to content).
-- **LLM Interaction:** Uses OpenRouter (model: `deepseek/deepseek-chat-v3-0324:free`) via `openai` library.
-- **Key Logic:** `ast.literal_eval` for stringified lists, fallback parser.
+- **Input:** `projects/<project_name>/content.md` (processed in chunks), `projects/<project_name>/output/layouts.json` (provides layout definitions).
+- **Output:** `projects/<project_name>/output/presentation.json` where each slide object is a `FinalSlide.model_dump()`.
+- **LLM Interaction (Agentic):**
+    - Uses OpenRouter (e.g., `gpt-4-turbo` or preferred model) via `openai` client, integrated with `pydantic-ai`.
+    - **`call_planning_llm`:** Takes markdown chunk and layout definitions, returns `SlidePlan` Pydantic model using `pydantic-ai`.
+    - **`call_designer_llm`:** Takes `SlidePlan`, optional image path, and layout definitions, returns `FinalSlide` Pydantic model using `pydantic-ai`.
+- **Key Logic:**
+    - New `pptx_generator/models.py` defines `ImageGenerationRequest`, `SlidePlan`, `FinalSlide` Pydantic models.
+    - `process_content` orchestrates the agentic loop: plan -> (optional tool use/image gen) -> design.
+    - `pydantic-ai` ensures LLM outputs adhere to Pydantic models.
 - **Command:** `python -m pptx_generator.main process <project_name>`
 
 ### 3. Presentation Generation (`generator.py`)
@@ -53,30 +66,39 @@ graph TD
 
 ## Active Decisions
 - Continue with the three-component CLI structure (`analyze`, `process`, `generate`).
-- Maintain current JSON structures for `layouts.json` and `presentation.json`.
+- **Refactor `processor.py` to an agentic workflow using Pydantic models (`SlidePlan`, `FinalSlide`) and `pydantic-ai` (or relevant Pydantic AI modules) for improved reliability, intelligence, and structured LLM interaction.**
+- **Update `presentation.json` structure to directly reflect `FinalSlide.model_dump()` output for each slide.**
+- Maintain current JSON structure for `layouts.json`.
 
 ## Current Considerations
-- **Image Handling:** The current image path resolution in `generator.py` is basic. Needs to be more robust (e.g., handling paths relative to `content.md`, project's `images/` folder, or absolute paths). The LLM also needs to be prompted to provide actual image file names/paths rather than descriptions if images are to be embedded.
-- **Testing:** Need to expand test coverage, especially for integration tests across the three commands and for different template structures.
-- **Error Handling:** While improved, continue to refine error messages and recovery paths.
+- **Prompt Engineering for Agentic Calls:** Crafting effective prompts for `call_planning_llm` and `call_designer_llm` will be crucial for accurate Pydantic model population.
+- **Image Handling within Agentic Flow:** The `SlidePlan` (with `ImageGenerationRequest`) and `FinalSlide` models will provide the structure for deciding when to generate images and how to include their paths in the final slide data. Robust path resolution in `generator.py` will still be needed.
+- **Testing the Agentic Workflow:** New tests will be required for `models.py`, the new LLM calling functions, and the overall `process_content` loop in `processor.py`.
+- **Error Handling with Pydantic/pydantic-ai:** Leverage Pydantic's validation errors and `pydantic-ai`'s retry/error handling mechanisms for robust error handling during LLM calls.
 
 ## Immediate Next Steps
-1.  **Memory Bank Update:** (Completed with this update)
-2.  **Image Handling Refinement (Primary Focus):**
-    *   Define a clear strategy for image path specification in `content.md` and its representation in `presentation.json`.
-    *   Update `processor.py` (LLM prompt and parsing) to correctly extract and structure image information (e.g., filenames, alt text).
-    *   Enhance `generator.py` to robustly locate image files (relative to project, `images/` folder, or absolute paths) and embed them into presentations.
-3.  **Expand Test Suite:**
-    *   Develop comprehensive unit tests for each module (`analyzer.py`, `processor.py`, `generator.py`).
-    *   Create integration tests for the end-to-end `analyze` -> `process` -> `generate` workflow.
-    *   Include tests for various template structures and content types (including images once implemented).
-4.  **Error Handling and UX Refinements:**
-    *   Review and improve error messages for clarity and actionability.
-    *   Strengthen input validation.
+1.  **Memory Bank Update:** (This update) Document the planned agentic architecture.
+2.  **Implement Agentic Workflow in `processor.py` (Primary Focus):**
+    *   Create `pptx_generator/models.py` with `ImageGenerationRequest`, `SlidePlan`, and `FinalSlide` Pydantic models.
+    *   Implement `call_planning_llm` in `processor.py` to return a `SlidePlan`.
+    *   Implement `call_designer_llm` in `processor.py` to return a `FinalSlide`.
+    *   Refactor the `process_content` loop in `processor.py` to orchestrate the agentic flow.
+    *   Ensure `pydantic-ai` is used with the OpenAI client to validate LLM responses against these models.
+    *   Update `presentation.json` saving logic to use `FinalSlide.model_dump()`.
+3.  **Image Handling Refinement (Post-Agentic Refactor):**
+    *   Leverage the `ImageGenerationRequest` in `SlidePlan` and image path handling in `FinalSlide`.
+    *   Enhance `generator.py` for robust image file location and embedding.
+4.  **Expand Test Suite:**
+    *   Add unit tests for `models.py`.
+    *   Add unit tests for `call_planning_llm` and `call_designer_llm` (possibly with mocked LLM responses).
+    *   Update integration tests for the `process` command.
+5.  **Error Handling and UX Refinements:**
+    *   Integrate Pydantic validation errors into user feedback.
 
 ## Open Questions
-- How should users specify image paths in `content.md` for them to be correctly processed and embedded?
-- What level of detail should the LLM provide for image placeholders? (Filename vs. description).
+- What are the optimal prompt designs for `call_planning_llm` (to generate `SlidePlan`) and `call_designer_llm` (to generate `FinalSlide`) to ensure accurate Pydantic model population by the LLM?
+- How will `pydantic-ai`'s retry mechanisms (if available) be configured for handling transient LLM issues?
+- How should image filenames be uniquely generated if `generate_and_save_image` is called multiple times within a single `process` run?
 
 ## Blockers
 None currently. The main functionality is working.
