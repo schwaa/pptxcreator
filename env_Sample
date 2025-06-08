@@ -1,1 +1,2 @@
 OPENROUTER_API_KEY=sk-VVVVVVVVV
+OPENROUTER_MODEL_NAME="deepseek/deepseek-chat-v3-0324:free" # Or your preferred default model

@@ -155,9 +155,10 @@ def extract_json_from_response(response_content):
             json_str = response_content
     return json_str
 
-def call_llm(system_prompt, user_prompt, model_name=None):
+def call_llm(system_prompt, user_prompt): # model_name parameter removed
     """
     Calls the LLM (OpenRouter) to process the content.
+    The model name is now sourced from the OPENROUTER_MODEL_NAME environment variable.
     """
     openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
     if not openrouter_api_key:
@@ -169,7 +170,8 @@ def call_llm(system_prompt, user_prompt, model_name=None):
         api_key=openrouter_api_key,
     )
     
-    chosen_model = model_name or "deepseek/deepseek-chat-v3-0324:free" 
+    default_model = "deepseek/deepseek-chat-v3-0324:free"
+    chosen_model = os.getenv("OPENROUTER_MODEL_NAME", default_model)
     logging.info(f"Using OpenRouter API with model: {chosen_model}")
 
     try:
@@ -191,7 +193,7 @@ def call_llm(system_prompt, user_prompt, model_name=None):
         logging.error(f"Error calling OpenRouter LLM: {e}")
         return None
 
-def process_content(markdown_filepath, layouts_filepath, output_filepath, api_key_unused=None, model_name=None):
+def process_content(markdown_filepath, layouts_filepath, output_filepath, api_key_unused=None): # model_name parameter removed
     """
     Processes markdown content to produce a structured presentation plan,
     and now reliably handles and cleans malformed list-as-string responses from the LLM.
@@ -229,7 +231,7 @@ def process_content(markdown_filepath, layouts_filepath, output_filepath, api_ke
         markdown_content=markdown_content
     )
 
-    llm_response = call_llm(system_prompt, user_prompt, model_name=model_name)
+    llm_response = call_llm(system_prompt, user_prompt) # model_name argument removed
 
     if llm_response:
         # Ensure the "placeholders" key is used, not "content"
