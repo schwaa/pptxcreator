@@ -1,0 +1,31 @@
+{
+  "source_template_path": "dummy_template.pptx",
+  "layouts": [
+    {
+      "name": "Title Slide",
+      "placeholders": [
+        "Title 1",
+        "Subtitle 2"
+      ]
+    },
+    {
+      "name": "Title and Content",
+      "placeholders": [
+        "Title 1",
+        "Content Placeholder 1"
+      ]
+    },
+    {
+      "name": "Image with Caption",
+      "placeholders": [
+        "Title 1",
+        "Picture Placeholder 1",
+        "Caption Placeholder 1"
+      ]
+    },
+    {
+      "name": "Blank",
+      "placeholders": []
+    }
+  ]
+}
